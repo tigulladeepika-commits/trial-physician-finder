@@ -1,22 +1,47 @@
-"use client"; // << Add this
+"use client";
 
 import { useState } from "react";
 import { useTrials } from "./hooks/useTrials";
 import TrialCard from "./components/TrialCard";
 
 export default function Page() {
-  const [condition, setCondition] = useState("diabetes");
-  const [state, setState] = useState("TX");
+  const [condition, setCondition] = useState("");
+  const [state, setState] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
-  const { trials, loading } = useTrials(condition, state);
+  const { trials, loading } = useTrials(submitted ? condition : null, submitted ? state : null);
 
   return (
-    <div>
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        trials.map((trial) => <TrialCard key={trial.protocolSection.identificationModule.nctId} trial={trial} />)
-      )}
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">Trial Physician Finder</h1>
+
+      <div className="flex gap-2 mb-6">
+        <input
+          className="border p-2 rounded w-full"
+          placeholder="Condition (e.g. diabetes)"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value)}
+        />
+        <input
+          className="border p-2 rounded w-full"
+          placeholder="State (e.g. TX)"
+          value={state}
+          onChange={(e) => setState(e.target.value)}
+        />
+        <button
+          className="bg-blue-600 text-white px-4 py-2 rounded whitespace-nowrap"
+          onClick={() => setSubmitted(true)}
+        >
+          Search
+        </button>
+      </div>
+
+      {!submitted && <p className="text-gray-500">Enter a condition and state to search.</p>}
+      {submitted && loading && <p>Loading...</p>}
+      {submitted && !loading && trials.length === 0 && <p>No trials found.</p>}
+      {submitted && !loading && trials.map((trial) => (
+        <TrialCard key={trial.protocolSection.identificationModule.nctId} trial={trial} />
+      ))}
     </div>
   );
 }
