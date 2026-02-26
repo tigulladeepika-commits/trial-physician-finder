@@ -1,8 +1,14 @@
 "use client";
 
+type Filters = {
+  specialty: string;
+  radius: number;
+  city: string;
+};
+
 type Props = {
-  filters: { specialty: string; gender: string; radius: number; city: string };
-  setFilters: React.Dispatch<React.SetStateAction<{ specialty: string; gender: string; radius: number; city: string }>>;
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
   specialties: string[];
 };
 
@@ -20,16 +26,6 @@ export default function PhysicianFilters({ filters, setFilters, specialties }: P
         ))}
       </select>
 
-      <select
-        className="border p-2 w-full"
-        value={filters.gender}
-        onChange={(e) => setFilters((f) => ({ ...f, gender: e.target.value }))}
-      >
-        <option value="">Any Gender</option>
-        <option value="M">Male</option>
-        <option value="F">Female</option>
-      </select>
-
       <input
         className="border p-2 w-full"
         placeholder="Filter by city"
@@ -40,7 +36,7 @@ export default function PhysicianFilters({ filters, setFilters, specialties }: P
       <input
         type="number"
         className="border p-2 w-full"
-        placeholder="Radius (miles)"
+        placeholder="Radius (km)"
         value={filters.radius}
         onChange={(e) => setFilters((f) => ({ ...f, radius: Number(e.target.value) }))}
       />

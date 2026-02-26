@@ -1,15 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-
-type Physician = {
-  npi: string;
-  name: string;
-  city: string;
-  state: string;
-  specialty: string;
-  gender: string;
-};
+import { Physician } from "../types";
 
 type MapViewProps = {
   center: [number, number];
