@@ -1,20 +1,24 @@
 "use client";
 
-import { Physician, Trial } from "../types";
+import { Trial } from "../types";
 
 type TrialCardProps = {
   trial: Trial;
 };
 
 export default function TrialCard({ trial }: TrialCardProps) {
-  const id = trial.protocolSection.identificationModule.nctId;
-  const title = trial.protocolSection.identificationModule.briefTitle;
-  const status = trial.protocolSection.statusModule.overallStatus;
-
   return (
     <div className="border rounded p-4 shadow space-y-3">
-      <h2 className="font-bold text-lg">{title}</h2>
-      <p className="text-sm text-gray-600">Trial ID: {id} | Status: {status}</p>
+      <h2 className="font-bold text-lg">{trial.title}</h2>
+      <p className="text-sm text-gray-600">
+        Trial ID: {trial.nctId} | Status: {trial.status}
+      </p>
+      {trial.description && (
+        <p className="text-sm text-gray-700">{trial.description}</p>
+      )}
+      {trial.sponsor && (
+        <p className="text-sm text-gray-500">Sponsor: {trial.sponsor}</p>
+      )}
 
       <h3 className="font-semibold">Nearby Physicians</h3>
 
@@ -24,9 +28,12 @@ export default function TrialCard({ trial }: TrialCardProps) {
             <li key={doc.npi} className="border p-2 rounded">
               <p className="font-medium">{doc.name}</p>
               <p className="text-sm text-gray-500">
-                {doc.city}, {doc.state}
+                {doc.address && `${doc.address}, `}{doc.city}, {doc.state} {doc.postal_code}
               </p>
               <p className="text-sm italic">{doc.specialty}</p>
+              {doc.distance_km != null && (
+                <p className="text-xs text-blue-500">{doc.distance_km} km away</p>
+              )}
             </li>
           ))}
         </ul>
