@@ -14,7 +14,8 @@ app = FastAPI(title="TrialPhysician Finder API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://trial-physician-finder-mp9h-avdx8xda.vercel.app",
-        "http://localhost:3000",],  
+        "http://localhost:3000",
+        "https://trial-physician-finder-mp9h-j2duwi0ne.vercel.app"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
