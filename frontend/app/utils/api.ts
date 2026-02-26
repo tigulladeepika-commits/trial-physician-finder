@@ -1,5 +1,5 @@
-export async function fetchTrials(condition: string, state: string, specialty?: string, limit?: number) {
-  const params = new URLSearchParams({ condition, state });
+export async function fetchTrials(condition: string, city: string, state: string, specialty?: string, limit?: number) {
+  const params = new URLSearchParams({ condition, city, state });
   if (specialty) params.append("specialty", specialty);
   if (limit) params.append("limit", String(limit));
 
