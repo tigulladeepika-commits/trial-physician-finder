@@ -6,10 +6,15 @@ import TrialCard from "./components/TrialCard";
 
 export default function Page() {
   const [condition, setCondition] = useState("");
+  const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const { trials, loading } = useTrials(submitted ? condition : null, submitted ? state : null);
+  const { trials, loading } = useTrials(
+    submitted ? condition : null,
+    submitted ? city : null,
+    submitted ? state : null
+  );
 
   return (
     <div className="max-w-3xl mx-auto p-6">
@@ -21,6 +26,12 @@ export default function Page() {
           placeholder="Condition (e.g. diabetes)"
           value={condition}
           onChange={(e) => setCondition(e.target.value)}
+        />
+        <input
+          className="border p-2 rounded w-full"
+          placeholder="City (e.g. Dallas)"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
         />
         <input
           className="border p-2 rounded w-full"
@@ -36,12 +47,13 @@ export default function Page() {
         </button>
       </div>
 
-      {!submitted && <p className="text-gray-500">Enter a condition and state to search.</p>}
+      {!submitted && <p className="text-gray-500">Enter a condition, city, and state to search.</p>}
       {submitted && loading && <p>Loading...</p>}
       {submitted && !loading && trials.length === 0 && <p>No trials found.</p>}
       {submitted && !loading && trials.map((trial) => (
-        <TrialCard key={trial.protocolSection.identificationModule.nctId} trial={trial} />
+        <TrialCard key={trial.nctId} trial={trial} />
       ))}
     </div>
   );
 }
+" " 
