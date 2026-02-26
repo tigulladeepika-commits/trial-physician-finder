@@ -9,14 +9,20 @@ router = APIRouter()
 
 def filter_physicians_by_distance(trial_coords: dict, physicians: list, max_km: float = 50):
     """Keep only physicians within max_km of trial site."""
+    trial_lat = trial_coords.get("lat")
+    trial_lon = trial_coords.get("lon")
+
+    if trial_lat is None or trial_lon is None:
+        return []
+
+    trial_point = (trial_lat, trial_lon)
     filtered = []
-    trial_point = (trial_coords.get("lat"), trial_coords.get("lon"))
 
     for doc in physicians:
         if doc.get("lat") is not None and doc.get("lon") is not None:
             dist = geodesic(trial_point, (doc["lat"], doc["lon"])).km
             if dist <= max_km:
-                filtered.append(doc)
+                filtered.append({**doc, "distance_km": round(dist, 2)})
 
     return filtered
 
@@ -24,6 +30,7 @@ def filter_physicians_by_distance(trial_coords: dict, physicians: list, max_km: 
 @router.get("/")
 async def get_trials_with_physicians(
     condition: str = Query(...),
+    city: str = Query(...),        # ← added city
     state: str = Query(...),
     specialty: str | None = Query(None),
     limit: int = Query(10, ge=1),
@@ -35,16 +42,14 @@ async def get_trials_with_physicians(
     Supports pagination via `limit` and `offset`.
     """
 
-    # 1️⃣ Fetch trials (run blocking request in executor)
+    # 1️⃣ Fetch trials — run in executor only if fetch_trials is sync
     loop = asyncio.get_running_loop()
     trials = await loop.run_in_executor(
         None, fetch_trials, condition, state, limit, offset
     )
 
-    # 2️⃣ Fetch physicians (also blocking)
-    physicians = await loop.run_in_executor(
-        None, fetch_physicians_near, state, specialty, 100
-    )
+    # 2️⃣ Fetch physicians — now properly awaited as async
+    physicians = await fetch_physicians_near(city, state, specialty, 100)
 
     # 3️⃣ Merge and filter physicians per trial
     for trial in trials:
@@ -59,6 +64,7 @@ async def get_trials_with_physicians(
 
     return {
         "condition": condition,
+        "city": city,
         "state": state,
         "trials": trials,
         "pagination": {
