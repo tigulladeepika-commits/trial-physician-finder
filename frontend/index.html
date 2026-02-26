@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Trial Finder</title>
+  </head>
+  <body>
+    <h1>Trials</h1>
+    <pre id="output"></pre>
+
+    <script>
+      fetch("http://127.0.0.1:9000/api/trials?condition=diabetes&state=TX&specialty=endocrinology&limit=5")
+        .then(res => res.json())
+        .then(data => {
+          console.log(data);
+          document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+        });
+    </script>
+  </body>
+</html>

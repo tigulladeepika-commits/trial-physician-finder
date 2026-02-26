@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic
+redis
+duckdb
+python-dotenv
+geopy
+slowapi  # for rate limiting
