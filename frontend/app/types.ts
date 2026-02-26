@@ -1,20 +1,29 @@
 export type Physician = {
-  id: string;
   npi: string;
   name: string;
   city: string;
   state: string;
+  address: string;
+  postal_code: string;
   specialty: string;
-  gender: string;
+  lat: number | null;
+  lon: number | null;
+  distance_km: number;
 };
 
 export type Trial = {
-  lat: number;
-  lng: number;
-  locations: { lat: number; lng: number }[];
-  physicians: Physician[];
-  protocolSection: {
-    identificationModule: { nctId: string; briefTitle: string };
-    statusModule: { overallStatus: string };
+  nctId: string;
+  title: string;
+  status: string;
+  description: string;
+  conditions: string[];
+  sponsor: string;
+  contactsLocationsModule: {
+    locations: {
+      city: string;
+      state: string;
+      geoPoint: { lat: number; lon: number };
+    }[];
   };
+  physicians: Physician[];
 };
