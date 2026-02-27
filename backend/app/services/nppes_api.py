@@ -2,9 +2,11 @@ import httpx
 import logging
 from app.services.mapquest_api import geocode_address
 
+
 logger = logging.getLogger(__name__)
 
 NPPES_BASE_URL = "https://npiregistry.cms.hhs.gov/api/"
+
 
 async def fetch_physicians_near(city: str, state: str, specialty: str | None = None, limit: int = 10):
     """
@@ -15,11 +17,12 @@ async def fetch_physicians_near(city: str, state: str, specialty: str | None = N
         "city": city,
         "state": state,
         "limit": limit,
-        "version": "2.1"
+        "version": "2.1",
+        "enumeration_type": "NPI-1",  # Individual providers only (not organizations)
     }
 
-    if specialty:
-        params["taxonomy_description"] = specialty
+    # NOTE: NPPES does NOT support `taxonomy_description` as a query param.
+    # We fetch all results and filter by specialty client-side instead.
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -36,12 +39,31 @@ async def fetch_physicians_near(city: str, state: str, specialty: str | None = N
     raw_results = data.get("results", [])
     logger.info(f"NPPES returned {len(raw_results)} results for city={city}, state={state}")
 
+    # Normalize specialty keyword for client-side filtering
+    specialty_lower = specialty.lower().strip() if specialty else None
+
     results = []
 
     for item in raw_results:
         basic = item.get("basic", {})
         addresses = item.get("addresses", [])
+        taxonomies = item.get("taxonomies", [])
 
+        # --- Specialty filtering (client-side) ---
+        if specialty_lower:
+            taxonomy_descs = [t.get("desc", "").lower() for t in taxonomies]
+            if not any(specialty_lower in desc for desc in taxonomy_descs):
+                logger.debug(f"Skipping NPI {item.get('number')} — no taxonomy match for '{specialty}'")
+                continue
+
+        # --- Get primary taxonomy for display ---
+        primary_taxonomy = next(
+            (t for t in taxonomies if t.get("primary")),
+            taxonomies[0] if taxonomies else {}
+        )
+        specialty_desc = primary_taxonomy.get("desc", basic.get("credential", ""))
+
+        # --- Get practice address ---
         practice_address = next(
             (a for a in addresses if a.get("address_purpose") == "LOCATION"), None
         )
@@ -71,10 +93,10 @@ async def fetch_physicians_near(city: str, state: str, specialty: str | None = N
             "state": practice_address.get("state"),
             "address": practice_address.get("address_1"),
             "postal_code": practice_address.get("postal_code"),
-            "specialty": basic.get("credential"),
+            "specialty": specialty_desc,  # ✅ Fixed: real taxonomy desc, not credential
             "lat": lat,
             "lon": lon,
         })
 
-    logger.info(f"Returning {len(results)} physicians with valid addresses.")
+    logger.info(f"Returning {len(results)} physicians after specialty filtering.")
     return results
