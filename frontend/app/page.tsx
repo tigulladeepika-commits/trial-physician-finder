@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTrials } from "./hooks/useTrials";
 import { usePhysicians } from "./hooks/usePhysicians";
 import TrialCard from "./components/TrialCard";
 import PhysicianCard from "./components/PhysicianCard";
-import { Physician } from "./types";
+import { Physician, Trial } from "./types";
 
 export default function Page() {
   const [condition, setCondition] = useState("");
@@ -18,7 +18,6 @@ export default function Page() {
   const [phase, setPhase] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  // Parse "Dallas, TX" or "dallas,TX" into city and state
   const parseLocation = (loc: string) => {
     const parts = loc.split(",").map((s) => s.trim());
     return { city: parts[0] || "", state: parts[1] || "" };
@@ -34,15 +33,40 @@ export default function Page() {
     undefined
   );
 
+  const NON_US = [
+    "Israel", "Germany", "India", "Spain", "Italy", "Australia",
+    "Finland", "Poland", "Netherlands", "Sweden", "United Kingdom", "Canada",
+  ];
+
+  const trialLocations = useMemo(() => {
+    if (!submitted) return null;
+
+    // If user typed a location manually, use that
+    if (city && state) return [{ city, state }];
+
+    // Otherwise extract US locations from all trial results
+    if (!trials || trials.length === 0) return null;
+
+    const locations: Array<{ city: string; state: string }> = [];
+    for (const trial of trials) {
+      for (const loc of (trial as any).locations ?? []) {
+        const isNonUS = NON_US.some((c) => loc.includes(c));
+        if (isNonUS) continue;
+        const parts = loc.split(",").map((s: string) => s.trim());
+        if (parts.length >= 2) {
+          locations.push({ city: parts[0], state: parts[1] });
+        }
+      }
+    }
+    return locations.length > 0 ? locations : null;
+  }, [submitted, city, state, trials]);
+
   const { physicians, loading: physiciansLoading } = usePhysicians(
-    submitted && city ? city : null,
-    submitted && state ? state : null,
-    submitted && condition ? condition : null
+    submitted ? trialLocations : null,
+    submitted ? (condition || null) : null
   );
 
-  const handleSearch = () => {
-    setSubmitted(true);
-  };
+  const handleSearch = () => setSubmitted(true);
 
   const handleReset = () => {
     setCondition("");
@@ -100,7 +124,9 @@ export default function Page() {
 
           <div>
             <label className="block text-sm font-semibold mb-1">Location</label>
-            <p className="text-xs text-gray-500 mb-1">Search by city and state, e.g. "Dallas, TX"</p>
+            <p className="text-xs text-gray-500 mb-1">
+              Search by city and state, e.g. "Dallas, TX" (optional)
+            </p>
             <input
               className="border rounded w-full p-2 text-sm"
               placeholder="e.g. Dallas, TX"
@@ -203,13 +229,20 @@ export default function Page() {
       {submitted && !trialsLoading && trials.length === 0 && (
         <p className="text-sm text-gray-500">No trials found.</p>
       )}
-      {submitted && !trialsLoading && trials.map((trial) => (
+      {submitted && !trialsLoading && trials.map((trial: Trial) => (
         <TrialCard key={trial.nctId} trial={trial} />
       ))}
 
       {submitted && (
         <div className="mt-8">
-          <h2 className="text-xl font-bold mb-3">Nearby Physicians</h2>
+          <h2 className="text-xl font-bold mb-1">Nearby Physicians</h2>
+          <p className="text-xs text-gray-400 mb-3">
+            {city && state
+              ? `Showing physicians in ${city}, ${state}`
+              : condition
+              ? `Showing specialists related to "${condition}" across trial locations`
+              : "Showing physicians across all trial locations"}
+          </p>
           {physiciansLoading && <p className="text-sm text-gray-500">Loading physicians...</p>}
           {!physiciansLoading && physicians.length === 0 && (
             <p className="text-sm text-gray-500">No physicians found.</p>
