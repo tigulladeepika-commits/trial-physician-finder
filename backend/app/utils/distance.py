@@ -1,20 +1,19 @@
-import math
+# In trials.py, replace the import and filter function:
 
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Returns distance in kilometers between two lat/lng points.
-    """
-    R = 6371  # Earth radius in km
+from app.utils.distance import haversine_distance
 
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    d_phi = math.radians(lat2 - lat1)
-    d_lambda = math.radians(lon2 - lon1)
+def filter_physicians_by_distance(trial_coords: dict, physicians: list, max_km: float = 50):
+    trial_lat = trial_coords.get("lat")
+    trial_lon = trial_coords.get("lon")
 
-    a = (
-        math.sin(d_phi / 2) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
-    )
+    if trial_lat is None or trial_lon is None:
+        return []
 
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+    filtered = []
+    for doc in physicians:
+        if doc.get("lat") is not None and doc.get("lon") is not None:
+            dist = haversine_distance(trial_lat, trial_lon, doc["lat"], doc["lon"])
+            if dist <= max_km:
+                filtered.append({**doc, "distance_km": round(dist, 2)})
+
+    return filtered
