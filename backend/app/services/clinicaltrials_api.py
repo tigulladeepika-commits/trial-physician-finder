@@ -58,12 +58,6 @@ def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: in
         "pageSize": limit,
         "countTotal": "true",
         "format": "json",
-        "fields": (
-            "NCTId,BriefTitle,OverallStatus,"
-            "ContactsLocationsModule,DescriptionModule,"
-            "ConditionsModule,SponsorCollaboratorsModule,"
-            "EligibilityModule,DesignModule"
-        ),
     }
 
     if location_query:
