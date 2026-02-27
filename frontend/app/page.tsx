@@ -18,6 +18,7 @@ export default function Page() {
   const [phase, setPhase] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  // Parse "Dallas, TX" or "dallas,TX" into city and state
   const parseLocation = (loc: string) => {
     const parts = loc.split(",").map((s) => s.trim());
     return { city: parts[0] || "", state: parts[1] || "" };
@@ -26,21 +27,21 @@ export default function Page() {
   const { city, state } = parseLocation(location);
 
   const { trials, loading: trialsLoading } = useTrials(
-    submitted ? condition : null,
-    submitted ? city : null,
-    submitted ? state : null,
+    submitted ? (condition || " ") : null,
+    submitted ? (city || " ") : null,
+    submitted ? (state || " ") : null,
     submitted ? otherTerms : undefined,
     undefined
   );
 
   const { physicians, loading: physiciansLoading } = usePhysicians(
-    submitted ? city : null,
-    submitted ? state : null,
-    submitted ? condition : null
+    submitted && city ? city : null,
+    submitted && state ? state : null,
+    submitted && condition ? condition : null
   );
 
   const handleSearch = () => {
-    if (condition || location) setSubmitted(true);
+    setSubmitted(true);
   };
 
   const handleReset = () => {
@@ -197,10 +198,6 @@ export default function Page() {
           </button>
         </div>
       </div>
-
-      {!submitted && (
-        <p className="text-gray-500 text-sm">Enter a condition or location to search.</p>
-      )}
 
       {submitted && trialsLoading && <p className="text-sm text-gray-500">Loading trials...</p>}
       {submitted && !trialsLoading && trials.length === 0 && (
