@@ -18,23 +18,25 @@ export default function PhysicianPanel({ trial }: PhysicianPanelProps) {
     city: "",
   });
 
-  const physicians = trial.physicians.filter((doc) => {
+  const allPhysicians = trial.physicians ?? [];
+
+  const physicians = allPhysicians.filter((doc) => {
     return (
       (!filters.specialty || doc.specialty === filters.specialty) &&
-      (!filters.city || doc.city.toLowerCase().includes(filters.city.toLowerCase()))
+      (!filters.city || (doc.city ?? "").toLowerCase().includes(filters.city.toLowerCase()))
     );
   });
 
-  const specialties = [...new Set(trial.physicians.map((p) => p.specialty))];
+  const specialties = [...new Set(allPhysicians.map((p) => p.specialty).filter((s): s is string => s !== undefined))];
 
-  // Extract trial center coords from contactsLocationsModule
   const firstLocation = trial.contactsLocationsModule?.locations?.[0];
   const trialLat = firstLocation?.geoPoint?.lat ?? 0;
   const trialLng = firstLocation?.geoPoint?.lon ?? 0;
   const trialLocations = trial.contactsLocationsModule?.locations?.map((loc) => ({
-    lat: loc.geoPoint?.lat,
-    lng: loc.geoPoint?.lon,
+  lat: loc.geoPoint?.lat ?? 0,
+  lng: loc.geoPoint?.lon ?? 0,
   })) ?? [];
+
 
   return (
     <div className="mt-4">

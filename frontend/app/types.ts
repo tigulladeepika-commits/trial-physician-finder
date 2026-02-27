@@ -31,6 +31,21 @@ export type Trial = {
     postal_code?: string;
     distance_km?: number | null;
   }[];
+  contactsLocationsModule?: {
+    locations?: {
+      geoPoint?: { lat?: number; lon?: number };
+      facility?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+    }[];
+    centralContacts?: {
+      name?: string;
+      role?: string;
+      phone?: string;
+      email?: string;
+    }[];
+  };
 };
 
 export type Physician = {
