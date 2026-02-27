@@ -35,7 +35,7 @@ export default function Page() {
 
   const NON_US = [
     "Israel", "Germany", "India", "Spain", "Italy", "Australia",
-    "Finland", "Poland", "Netherlands", "Sweden", "United Kingdom", "Canada",
+    "Finland", "Poland", "Netherlands", "Sweden", "United Kingdom", "Canada", "France",
   ];
 
   const trialLocations = useMemo(() => {
@@ -48,16 +48,22 @@ export default function Page() {
     if (!trials || trials.length === 0) return null;
 
     const locations: Array<{ city: string; state: string }> = [];
+
     for (const trial of trials) {
       for (const loc of (trial as any).locations ?? []) {
-        const isNonUS = NON_US.some((c) => loc.includes(c));
+        // loc is an object: { facility, city, state, country, status }
+        const country = loc.country ?? "";
+        const isNonUS = NON_US.some((c) => country.includes(c));
         if (isNonUS) continue;
-        const parts = loc.split(",").map((s: string) => s.trim());
-        if (parts.length >= 2) {
-          locations.push({ city: parts[0], state: parts[1] });
+
+        const locCity = loc.city ?? "";
+        const locState = loc.state ?? "";
+        if (locCity && locState) {
+          locations.push({ city: locCity, state: locState });
         }
       }
     }
+
     return locations.length > 0 ? locations : null;
   }, [submitted, city, state, trials]);
 
@@ -225,7 +231,9 @@ export default function Page() {
         </div>
       </div>
 
-      {submitted && trialsLoading && <p className="text-sm text-gray-500">Loading trials...</p>}
+      {submitted && trialsLoading && (
+        <p className="text-sm text-gray-500">Loading trials...</p>
+      )}
       {submitted && !trialsLoading && trials.length === 0 && (
         <p className="text-sm text-gray-500">No trials found.</p>
       )}
@@ -243,7 +251,9 @@ export default function Page() {
               ? `Showing specialists related to "${condition}" across trial locations`
               : "Showing physicians across all trial locations"}
           </p>
-          {physiciansLoading && <p className="text-sm text-gray-500">Loading physicians...</p>}
+          {physiciansLoading && (
+            <p className="text-sm text-gray-500">Loading physicians...</p>
+          )}
           {!physiciansLoading && physicians.length === 0 && (
             <p className="text-sm text-gray-500">No physicians found.</p>
           )}
