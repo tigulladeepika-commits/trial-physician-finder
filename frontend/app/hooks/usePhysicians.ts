@@ -21,7 +21,7 @@ export function usePhysicians(
           const uniqueLocations = deduplicateLocations(locations);
           const allResults = await Promise.all(
             uniqueLocations.map(({ city, state }) =>
-              fetchPhysicians(city, state, condition ?? undefined)
+              fetchPhysicians(city, state, condition ?? "")
             )
           );
 
@@ -37,7 +37,7 @@ export function usePhysicians(
           }
           setPhysicians(merged);
         } else {
-          const results = await fetchPhysicians(undefined, undefined, condition ?? undefined);
+          const results = await fetchPhysicians(undefined, undefined, condition ?? "");
           setPhysicians(results);
         }
       } catch (err) {
