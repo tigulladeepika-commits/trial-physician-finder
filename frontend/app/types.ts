@@ -1,29 +1,45 @@
-export type Physician = {
-  npi: string;
-  name: string;
-  city: string;
-  state: string;
-  address: string;
-  postal_code: string;
-  specialty: string;
-  lat: number | null;
-  lon: number | null;
-  distance_km: number;
-};
-
 export type Trial = {
   nctId: string;
   title: string;
   status: string;
-  description: string;
-  conditions: string[];
-  sponsor: string;
-  contactsLocationsModule: {
-    locations: {
-      city: string;
-      state: string;
-      geoPoint: { lat: number; lon: number };
-    }[];
-  };
-  physicians: Physician[];
+  description?: string;
+  conditions?: string[];
+  sponsor?: string;
+  phases?: string[];
+  locations?: {
+    facility?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    status?: string;
+  }[];
+  inclusionCriteria?: string;
+  exclusionCriteria?: string;
+  pointOfContact?: {
+    name?: string;
+    role?: string;
+    phone?: string;
+    email?: string;
+  } | null;
+  physicians?: {
+    npi: string;
+    name: string;
+    specialty?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    distance_km?: number | null;
+  }[];
+};
+
+export type Physician = {
+  npi: string;
+  name: string;
+  specialty?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  distance_km?: number | null;
 };
