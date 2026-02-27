@@ -19,11 +19,11 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
         "fields": (
             "NCTId,BriefTitle,OverallStatus,"
             "ContactsLocationsModule,DescriptionModule,"
-            "ConditionsModule,SponsorCollaboratorsModule"
+            "ConditionsModule,SponsorCollaboratorsModule,"
+            "EligibilityModule,DesignModule"
         ),
     }
 
-    # ClinicalTrials v2 uses page tokens for pagination, not numeric offset
     if offset > 0:
         page_token = _get_page_token(params, offset)
         if page_token:
@@ -45,28 +45,67 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
     studies = data.get("studies", [])
     logger.info(f"ClinicalTrials returned {len(studies)} studies for condition={condition}, state={state}")
 
-    # Flatten each study so trials.py can access modules directly
     results = []
     for study in studies:
         protocol = study.get("protocolSection", {})
+
+        # Locations
+        locations_module = protocol.get("contactsLocationsModule", {})
+        locations = [
+            {
+                "facility": loc.get("facility"),
+                "city": loc.get("city"),
+                "state": loc.get("state"),
+                "country": loc.get("country"),
+                "status": loc.get("recruitmentStatus"),
+            }
+            for loc in locations_module.get("locations", [])
+        ]
+
+        # Point of contact
+        central_contacts = locations_module.get("centralContacts", [])
+        point_of_contact = None
+        if central_contacts:
+            c = central_contacts[0]
+            point_of_contact = {
+                "name": c.get("name"),
+                "role": c.get("role"),
+                "phone": c.get("phone"),
+                "email": c.get("email"),
+            }
+
+        # Eligibility criteria
+        eligibility = protocol.get("eligibilityModule", {})
+        criteria_text = eligibility.get("eligibilityCriteria", "")
+        inclusion_criteria = ""
+        exclusion_criteria = ""
+        if "Inclusion Criteria:" in criteria_text:
+            parts = criteria_text.split("Exclusion Criteria:")
+            inclusion_criteria = parts[0].replace("Inclusion Criteria:", "").strip()
+            exclusion_criteria = parts[1].strip() if len(parts) > 1 else ""
+
+        # Phases
+        design_module = protocol.get("designModule", {})
+        phases = design_module.get("phases", [])
+
         results.append({
             "nctId": protocol.get("identificationModule", {}).get("nctId"),
             "title": protocol.get("identificationModule", {}).get("briefTitle"),
             "status": protocol.get("statusModule", {}).get("overallStatus"),
             "description": protocol.get("descriptionModule", {}).get("briefSummary"),
-            "contactsLocationsModule": protocol.get("contactsLocationsModule", {}),
             "conditions": protocol.get("conditionsModule", {}).get("conditions", []),
             "sponsor": protocol.get("sponsorCollaboratorsModule", {}).get("leadSponsor", {}).get("name"),
+            "phases": phases,
+            "locations": locations,
+            "inclusionCriteria": inclusion_criteria,
+            "exclusionCriteria": exclusion_criteria,
+            "pointOfContact": point_of_contact,
         })
 
     return results
 
 
 def _get_page_token(base_params: dict, offset: int) -> str | None:
-    """
-    ClinicalTrials v2 paginates via nextPageToken, not numeric offset.
-    Walk pages until we reach the right one.
-    """
     params = {**base_params, "pageSize": offset}
     try:
         response = requests.get(
