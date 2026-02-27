@@ -26,15 +26,32 @@ STATE_MAP = {
 }
 
 
-def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
-    # Expand state abbreviation to full name
-    location_query = None
-    if state and state.strip():
-        expanded = STATE_MAP.get(state.upper().strip(), state.strip())
-        if "united states" not in expanded.lower():
-            location_query = f"{expanded}, United States"
-        else:
-            location_query = expanded
+def _expand_location(location: str) -> str | None:
+    """
+    Takes a location string like 'TX', 'Dallas, TX', or 'Texas' and
+    returns a fully expanded string for the ClinicalTrials API.
+    """
+    if not location or not location.strip():
+        return None
+
+    parts = [p.strip() for p in location.split(",")]
+
+    # Expand any part that is a 2-letter state abbreviation
+    expanded_parts = []
+    for part in parts:
+        expanded_parts.append(STATE_MAP.get(part.upper(), part))
+
+    result = ", ".join(expanded_parts)
+
+    # Append United States if not already present
+    if "united states" not in result.lower():
+        result = f"{result}, United States"
+
+    return result
+
+
+def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: int = 0):
+    location_query = _expand_location(location)
 
     params = {
         "query.cond": condition,
@@ -71,13 +88,12 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
         return []
 
     studies = data.get("studies", [])
-    logger.info(f"ClinicalTrials returned {len(studies)} studies for condition={condition}, state={state}")
+    logger.info(f"ClinicalTrials returned {len(studies)} studies | condition={condition} | location={location_query}")
 
     results = []
     for study in studies:
         protocol = study.get("protocolSection", {})
 
-        # Locations
         locations_module = protocol.get("contactsLocationsModule", {})
         locations = [
             {
@@ -86,11 +102,12 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
                 "state": loc.get("state"),
                 "country": loc.get("country"),
                 "status": loc.get("recruitmentStatus"),
+                "lat": loc.get("geoPoint", {}).get("lat"),
+                "lon": loc.get("geoPoint", {}).get("lon"),
             }
             for loc in locations_module.get("locations", [])
         ]
 
-        # Point of contact
         central_contacts = locations_module.get("centralContacts", [])
         point_of_contact = None
         if central_contacts:
@@ -102,7 +119,6 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
                 "email": c.get("email"),
             }
 
-        # Eligibility criteria
         eligibility = protocol.get("eligibilityModule", {})
         criteria_text = eligibility.get("eligibilityCriteria", "")
         inclusion_criteria = ""
@@ -112,7 +128,6 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
             inclusion_criteria = parts[0].replace("Inclusion Criteria:", "").strip()
             exclusion_criteria = parts[1].strip() if len(parts) > 1 else ""
 
-        # Phases
         design_module = protocol.get("designModule", {})
         phases = design_module.get("phases", [])
 

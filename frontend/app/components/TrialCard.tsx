@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Trial } from "../types";
 
 type TrialCardProps = {
@@ -8,12 +7,6 @@ type TrialCardProps = {
 };
 
 export default function TrialCard({ trial }: TrialCardProps) {
-  const [showAllLocations, setShowAllLocations] = useState(false);
-
-  const visibleLocations = showAllLocations
-    ? trial.locations ?? []
-    : (trial.locations ?? []).slice(0, 3);
-
   return (
     <div className="border rounded p-4 shadow space-y-3 mb-4">
 
@@ -46,7 +39,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
         <div>
           <p className="text-sm font-semibold">Locations:</p>
           <ul className="text-sm text-gray-600 list-disc list-inside space-y-1 mt-1">
-            {visibleLocations.map((loc, i) => (
+            {trial.locations.map((loc, i) => (
               <li key={i}>
                 {[loc.facility, loc.city, loc.state, loc.country]
                   .filter(Boolean)
@@ -57,16 +50,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
               </li>
             ))}
           </ul>
-          {trial.locations.length > 3 && (
-            <button
-              className="text-sm text-blue-600 hover:underline mt-1"
-              onClick={() => setShowAllLocations(!showAllLocations)}
-            >
-              {showAllLocations
-                ? "Show less"
-                : `+${trial.locations.length - 3} more locations`}
-            </button>
-          )}
         </div>
       )}
 
