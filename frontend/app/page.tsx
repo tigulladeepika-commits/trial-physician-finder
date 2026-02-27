@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useTrials } from "./hooks/useTrials";
+import { usePhysicians } from "./hooks/usePhysicians";
 import TrialCard from "./components/TrialCard";
+import PhysicianCard from "./components/PhysicianCard";
 
 export default function Page() {
   const [condition, setCondition] = useState("");
@@ -10,10 +12,16 @@ export default function Page() {
   const [state, setState] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const { trials, loading } = useTrials(
+  const { trials, loading: trialsLoading } = useTrials(
     submitted ? condition : null,
     submitted ? city : null,
     submitted ? state : null
+  );
+
+  const { physicians, loading: physiciansLoading } = usePhysicians(
+    submitted ? city : null,
+    submitted ? state : null,
+    submitted ? condition : null  // using condition as specialty search term
   );
 
   return (
@@ -48,12 +56,27 @@ export default function Page() {
       </div>
 
       {!submitted && <p className="text-gray-500">Enter a condition, city, and state to search.</p>}
-      {submitted && loading && <p>Loading...</p>}
-      {submitted && !loading && trials.length === 0 && <p>No trials found.</p>}
-      {submitted && !loading && trials.map((trial) => (
+
+      {/* Trials Section */}
+      {submitted && trialsLoading && <p>Loading trials...</p>}
+      {submitted && !trialsLoading && trials.length === 0 && <p>No trials found.</p>}
+      {submitted && !trialsLoading && trials.map((trial) => (
         <TrialCard key={trial.nctId} trial={trial} />
       ))}
+
+      {/* Physicians Section */}
+      {submitted && (
+        <div className="mt-8">
+          <h2 className="text-xl font-bold mb-3">Nearby Physicians</h2>
+          {physiciansLoading && <p>Loading physicians...</p>}
+          {!physiciansLoading && physicians.length === 0 && (
+            <p className="text-gray-500">No physicians found.</p>
+          )}
+          {!physiciansLoading && physicians.map((doctor) => (
+            <PhysicianCard key={doctor.npi} doctor={doctor} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-" " 
