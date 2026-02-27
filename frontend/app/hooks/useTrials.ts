@@ -17,8 +17,10 @@ export function useTrials(
   useEffect(() => {
     if (!condition) return;
 
+    const locationStr = [city, state].filter(Boolean).join(", ");
+
     setLoading(true);
-    fetchTrials(condition, city ?? "", state ?? "", specialty, limit)
+    fetchTrials(condition, locationStr || "", "", specialty, limit)
       .then((data: Trial[]) => setTrials(data))
       .catch(() => setTrials([]))
       .finally(() => setLoading(false));

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Trial } from "../types";
 
 type TrialCardProps = {
@@ -7,9 +8,15 @@ type TrialCardProps = {
 };
 
 export default function TrialCard({ trial }: TrialCardProps) {
+  const [showAllLocations, setShowAllLocations] = useState(false);
+
+  const visibleLocations = showAllLocations
+    ? trial.locations ?? []
+    : (trial.locations ?? []).slice(0, 3);
+
   return (
     <div className="border rounded p-4 shadow space-y-3 mb-4">
-      {/* Header */}
+
       <h2 className="font-bold text-lg">{trial.title}</h2>
       <p className="text-sm text-gray-600">
         Trial ID: {trial.nctId} | Status: {trial.status}
@@ -18,7 +25,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
         )}
       </p>
 
-      {/* Conditions */}
       {trial.conditions && trial.conditions.length > 0 && (
         <p className="text-sm text-gray-600">
           <span className="font-semibold">Conditions: </span>
@@ -26,24 +32,21 @@ export default function TrialCard({ trial }: TrialCardProps) {
         </p>
       )}
 
-      {/* Description */}
       {trial.description && (
         <p className="text-sm text-gray-700">{trial.description}</p>
       )}
 
-      {/* Sponsor */}
       {trial.sponsor && (
         <p className="text-sm text-gray-500">
           <span className="font-semibold">Sponsor: </span>{trial.sponsor}
         </p>
       )}
 
-      {/* Locations */}
       {trial.locations && trial.locations.length > 0 && (
         <div>
           <p className="text-sm font-semibold">Locations:</p>
           <ul className="text-sm text-gray-600 list-disc list-inside space-y-1 mt-1">
-            {trial.locations.slice(0, 3).map((loc, i) => (
+            {visibleLocations.map((loc, i) => (
               <li key={i}>
                 {[loc.facility, loc.city, loc.state, loc.country]
                   .filter(Boolean)
@@ -53,14 +56,20 @@ export default function TrialCard({ trial }: TrialCardProps) {
                 )}
               </li>
             ))}
-            {trial.locations.length > 3 && (
-              <li className="text-gray-400">+{trial.locations.length - 3} more locations</li>
-            )}
           </ul>
+          {trial.locations.length > 3 && (
+            <button
+              className="text-sm text-blue-600 hover:underline mt-1"
+              onClick={() => setShowAllLocations(!showAllLocations)}
+            >
+              {showAllLocations
+                ? "Show less"
+                : `+${trial.locations.length - 3} more locations`}
+            </button>
+          )}
         </div>
       )}
 
-      {/* Inclusion Criteria */}
       {trial.inclusionCriteria && (
         <div>
           <p className="text-sm font-semibold">Inclusion Criteria:</p>
@@ -68,7 +77,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
         </div>
       )}
 
-      {/* Exclusion Criteria */}
       {trial.exclusionCriteria && (
         <div>
           <p className="text-sm font-semibold">Exclusion Criteria:</p>
@@ -76,7 +84,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
         </div>
       )}
 
-      {/* Point of Contact */}
       {trial.pointOfContact && (
         <div>
           <p className="text-sm font-semibold">Point of Contact:</p>

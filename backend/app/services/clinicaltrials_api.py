@@ -9,10 +9,35 @@ HEADERS = {
     "User-Agent": "TrialPhysicianFinder/1.0 (contact@example.com)"
 }
 
+STATE_MAP = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
+    "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
+    "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
+    "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas",
+    "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+    "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
+    "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
+    "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+    "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
+    "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
+    "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah",
+    "VT": "Vermont", "VA": "Virginia", "WA": "Washington", "WV": "West Virginia",
+    "WI": "Wisconsin", "WY": "Wyoming", "DC": "District of Columbia",
+}
+
+
 def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
+    # Expand state abbreviation to full name
+    location_query = None
+    if state and state.strip():
+        expanded = STATE_MAP.get(state.upper().strip(), state.strip())
+        if "united states" not in expanded.lower():
+            location_query = f"{expanded}, United States"
+        else:
+            location_query = expanded
+
     params = {
         "query.cond": condition,
-        "query.locn": state,
         "pageSize": limit,
         "countTotal": "true",
         "format": "json",
@@ -23,6 +48,9 @@ def fetch_trials(condition: str, state: str, limit: int = 10, offset: int = 0):
             "EligibilityModule,DesignModule"
         ),
     }
+
+    if location_query:
+        params["query.locn"] = location_query
 
     if offset > 0:
         page_token = _get_page_token(params, offset)
