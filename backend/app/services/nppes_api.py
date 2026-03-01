@@ -150,7 +150,7 @@ async def fetch_physicians_near(
         taxonomies = item.get("taxonomies", [])
 
         if specialty_lower:
-            taxonomy_descs = [t.get("desc", "").lower() for t in taxonomies]
+            taxonomy_descs = [(t.get("desc") or "").lower() for t in taxonomies]
             if not any(specialty_lower in desc for desc in taxonomy_descs):
                 continue
 
@@ -158,7 +158,7 @@ async def fetch_physicians_near(
             (t for t in taxonomies if t.get("primary")),
             taxonomies[0] if taxonomies else {}
         )
-        specialty_desc = primary_taxonomy.get("desc", basic.get("credential", "Unknown"))
+        specialty_desc = primary_taxonomy.get("desc") or basic.get("credential") or "Unknown"
 
         practice_address = next(
             (a for a in addresses if a.get("address_purpose") == "LOCATION"), None
