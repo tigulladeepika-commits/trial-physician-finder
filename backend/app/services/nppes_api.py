@@ -625,7 +625,7 @@ async def fetch_physicians_near(
 
     results = await asyncio.gather(*[geocode_physician(p) for p in physicians_to_geocode])
     logger.info(f"Returning {len(results)} physicians.")
-    return list(results)
+    return list(results)[:5]
 
 
 def _code_to_description(code: str) -> str:
