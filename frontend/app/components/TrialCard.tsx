@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Trial, Physician } from "../types";
 import { fetchPhysicians } from "../utils/api";
 import PhysicianCard from "./PhysicianCard";
+import PhysicianTrialMap from "./PhysicianTrialMap";  // ✅ new import
 
 type TrialCardProps = {
   trial: Trial;
@@ -20,12 +21,14 @@ export default function TrialCard({ trial }: TrialCardProps) {
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
   const [error, setError] = useState(false);
+  const [showMap, setShowMap] = useState(false);  // ✅ new
 
   const handleFetchPhysicians = async () => {
     if (fetched) {
       // Toggle — if already fetched, collapse
       setFetched(false);
       setPhysicians([]);
+      setShowMap(false);  // ✅ also hide map when collapsing
       return;
     }
 
@@ -168,8 +171,8 @@ export default function TrialCard({ trial }: TrialCardProps) {
         </div>
       )}
 
-      {/* ✅ Fetch Physicians Button */}
-      <div className="pt-2 border-t mt-2">
+      {/* Fetch Physicians Button + Visualize Button */}
+      <div className="pt-2 border-t mt-2 flex flex-wrap gap-2">
         <button
           onClick={handleFetchPhysicians}
           disabled={loading}
@@ -185,11 +188,30 @@ export default function TrialCard({ trial }: TrialCardProps) {
             ? "Hide Physicians"
             : "Find Physicians for this Trial"}
         </button>
+
+        {/* ✅ Visualize button — only shown after physicians are fetched */}
+        {fetched && !loading && (
+          <button
+            onClick={() => setShowMap((prev) => !prev)}
+            className={`text-sm px-4 py-2 rounded font-semibold transition-colors ${
+              showMap
+                ? "bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-300"
+                : "bg-purple-600 text-white hover:bg-purple-700"
+            }`}
+          >
+            {showMap ? "Hide Map" : "🗺️ Visualize on Map"}
+          </button>
+        )}
       </div>
 
-      {/* ✅ Physicians results inline */}
+      {/* Physicians results inline */}
       {error && (
         <p className="text-sm text-red-500">Failed to load physicians. Please try again.</p>
+      )}
+
+      {/* ✅ Map — shown when Visualize clicked */}
+      {fetched && showMap && (
+        <PhysicianTrialMap trial={trial} physicians={physicians} />
       )}
 
       {fetched && !loading && (

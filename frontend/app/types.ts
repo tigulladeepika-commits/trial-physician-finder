@@ -12,6 +12,8 @@ export type Trial = {
     state?: string;
     country?: string;
     status?: string;
+    lat?: number;
+    lon?: number;
   }[];
   inclusionCriteria?: string;
   exclusionCriteria?: string;
@@ -57,4 +59,6 @@ export type Physician = {
   state?: string;
   postal_code?: string;
   distance_km?: number | null;
+  lat?: number;
+  lon?: number;
 };

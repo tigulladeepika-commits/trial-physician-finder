@@ -57,7 +57,7 @@ def _expand_location(location: str) -> str | None:
 def fetch_trials(
     condition: str,
     location: str = "",
-    limit: int = 10,
+    limit: int = 8,
     offset: int = 0,
 ) -> tuple[list, int]:
     """

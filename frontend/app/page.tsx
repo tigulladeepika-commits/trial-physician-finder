@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTrials } from "./hooks/useTrials";
 import TrialCard from "./components/TrialCard";
+import TrialMap from "./components/TrialMap";  // ✅ new import
 import { Trial } from "./types";
 
 export default function Page() {
@@ -180,6 +181,12 @@ export default function Page() {
       {submitted && !trialsLoading && trials.length === 0 && (
         <p className="text-sm text-gray-500">No trials found.</p>
       )}
+
+      {/* ✅ Global trials map — shown once trials load */}
+      {submitted && !trialsLoading && trials.length > 0 && (
+        <TrialMap trials={trials} />
+      )}
+
       {submitted && !trialsLoading && trials.map((trial: Trial) => (
         <TrialCard key={trial.nctId} trial={trial} />
       ))}
