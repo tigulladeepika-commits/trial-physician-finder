@@ -53,16 +53,18 @@ def _expand_location(location: str) -> str | None:
         result = f"{result}, United States"
     return result
 
-
 def fetch_trials(
     condition: str,
     location: str = "",
     limit: int = 8,
     offset: int = 0,
-) -> tuple[list, int]:
+) -> dict:
     """
-    Returns a tuple of (results, total_count).
-    total_count is the full number of matching studies from the API.
+    Returns:
+    {
+        "trials": [ ... ],
+        "totalCount": int
+    }
     """
     location_query = _expand_location(location)
     condition_query = _expand_condition(condition)
@@ -178,7 +180,10 @@ def fetch_trials(
             "pointOfContact": point_of_contact,
         })
 
-    return results, total_count
+    return {
+    "trials": results,
+    "totalCount": total_count
+    }
 
 
 def _get_filter_keywords(condition: str) -> list[str]:
