@@ -302,15 +302,134 @@ def normalize_state(state: str) -> str | None:
     return STATE_ABBR.get(s.lower(), s.upper())
 
 
+# Explicit exclusion: NUCC codes that are definitively NOT physicians.
+# These cover mid-level and allied health providers that may appear in results.
+NON_PHYSICIAN_TAXONOMY_CODES = {
+    "363A00000X",  # Physician Assistant
+    "363AM0700X",  # Physician Assistant, Medical
+    "363AS0400X",  # Physician Assistant, Surgical
+    "363L00000X",  # Nurse Practitioner
+    "363LA2100X",  # Nurse Practitioner, Acute Care
+    "363LA2200X",  # Nurse Practitioner, Adult Health
+    "363LC0200X",  # Nurse Practitioner, Critical Care Medicine
+    "363LC1500X",  # Nurse Practitioner, Community Health
+    "363LE0002X",  # Nurse Practitioner, Gerontology
+    "363LF0000X",  # Nurse Practitioner, Family
+    "363LG0600X",  # Nurse Practitioner, Obstetrics & Gynecology
+    "363LN0000X",  # Nurse Practitioner, Neonatal
+    "363LN0005X",  # Nurse Practitioner, Neonatal, Critical Care
+    "363LP0200X",  # Nurse Practitioner, Pediatrics
+    "363LP0222X",  # Nurse Practitioner, Pediatrics, Critical Care
+    "363LP1700X",  # Nurse Practitioner, Psychiatric/Mental Health
+    "363LP2300X",  # Nurse Practitioner, Primary Care
+    "363LP0808X",  # Nurse Practitioner, OB/GYN
+    "363LS0200X",  # Nurse Practitioner, School
+    "363LW0102X",  # Nurse Practitioner, Women's Health
+    "363LX0001X",  # Nurse Practitioner, Oncology
+    "363LX0106X",  # Nurse Practitioner, Occupational Health
+    "367500000X",  # Nurse Anesthetist, Certified Registered
+    "367A00000X",  # Advanced Practice Midwife
+    "367H00000X",  # Anesthesiologist Assistant
+    "374700000X",  # Technician, Behavior Analyst
+    "246ZN0300X",  # Technician, Nuclear Medicine
+    "183500000X",  # Pharmacist
+    "1835C0205X",  # Pharmacist, Critical Care
+    "1835G0000X",  # Pharmacist, General Practice
+    "1835G0303X",  # Pharmacist, Geriatric
+    "1835N0905X",  # Pharmacist, Nuclear
+    "1835N1003X",  # Pharmacist, Nutrition Support
+    "1835P1200X",  # Pharmacist, Pharmacotherapy
+    "1835P1300X",  # Pharmacist, Psychiatric
+    "1835X0200X",  # Pharmacist, Oncology
+    "163WP0218X",  # Registered Nurse, Oncology
+    "163W00000X",  # Registered Nurse
+    "163WA0400X",  # Registered Nurse, Addiction (Substance Use Disorder)
+    "163WC0400X",  # Registered Nurse, Case Management
+    "163WC1400X",  # Registered Nurse, College Health
+    "163WC3500X",  # Registered Nurse, Critical Care Medicine
+    "163WD0400X",  # Registered Nurse, Dialysis
+    "163WE0003X",  # Registered Nurse, Emergency
+    "163WG0000X",  # Registered Nurse, General Practice
+    "163WL0100X",  # Registered Nurse, Gerontological
+    "163WM0102X",  # Registered Nurse, Home Health
+    "163WM0705X",  # Registered Nurse, Maternal Newborn
+    "163WN0002X",  # Registered Nurse, Neonatal
+    "163WN0003X",  # Registered Nurse, Neonatal, Low-Risk
+    "163WP0000X",  # Registered Nurse, Pediatrics
+    "163WP0808X",  # Registered Nurse, Psychiatric/Mental Health
+    "163WP1700X",  # Registered Nurse, Perinatal
+    "163WP2201X",  # Registered Nurse, Ambulatory Care
+    "163WR0400X",  # Registered Nurse, Rehabilitation
+    "163WR1000X",  # Registered Nurse, Reproductive Endocrinology/Infertility
+    "163WS0121X",  # Registered Nurse, School
+    "163WU0100X",  # Registered Nurse, Urology
+    "163WX0002X",  # Registered Nurse, Obstetric
+    "163WX0003X",  # Registered Nurse, Inpatient Obstetric
+    "163WX0106X",  # Registered Nurse, Occupational Health
+    "163WX0200X",  # Registered Nurse, Oncology
+    "163WX1100X",  # Registered Nurse, Ophthalmic
+    "163WX1500X",  # Registered Nurse, Ostomy Care
+    "101Y00000X",  # Counselor
+    "106H00000X",  # Marriage & Family Therapist
+    "111N00000X",  # Chiropractor
+    "122300000X",  # Dentist
+    "1223G0001X",  # Dentist, General Practice
+    "133N00000X",  # Nutritionist
+    "133NN1002X",  # Nutritionist, Nutrition, Education
+    "133V00000X",  # Dietitian, Registered
+    "146N00000X",  # Medical Technologist
+    "224P00000X",  # Rehabilitation Practitioner
+    "225100000X",  # Physical Therapist
+    "225200000X",  # Occupational Therapist
+    "225400000X",  # Respiratory Therapist
+    "225600000X",  # Dance Therapist
+    "225700000X",  # Massage Therapist
+    "225800000X",  # Recreation Therapist
+    "225C00000X",  # Rehabilitation Counselor
+    "225X00000X",  # Occupational Therapist
+    "226300000X",  # Kinesiotherapist
+    "231H00000X",  # Audiologist
+    "235Z00000X",  # Speech-Language Pathologist
+    "251B00000X",  # Case Manager/Care Coordinator
+    "261QP2300X",  # Clinic/Center, Primary Care
+    "291U00000X",  # Clinical Medical Laboratory
+    "3040P0500X",  # Podiatrist
+    "310400000X",  # Assisted Living Facility
+    "320600000X",  # Residential Treatment Facility
+    "332B00000X",  # Durable Medical Equipment
+    "333600000X",  # Pharmacy
+    "335E00000X",  # Prosthetic/Orthotic Supplier
+    "341600000X",  # Ambulance
+    "347B00000X",  # Taxi
+    "372500000X",  # Chore Provider
+    "374J00000X",  # Doula
+    "374T00000X",  # Religious Nonmedical Practitioner
+    "374U00000X",  # Home Health Aide
+    "376G00000X",  # Nursing Home Administrator
+    "376J00000X",  # Homemaker
+    "376K00000X",  # Nurse's Aide
+}
+
+
 def _is_physician(taxonomies: list) -> bool:
     """
-    Validate provider is a physician by checking their taxonomy code
-    against the official NUCC Allopathic & Osteopathic Physicians code list.
+    Validate provider is a physician using official NUCC taxonomy codes.
+    A provider is a physician if:
+      1. At least one of their taxonomy codes is in PHYSICIAN_TAXONOMY_CODES, AND
+      2. None of their taxonomy codes are in NON_PHYSICIAN_TAXONOMY_CODES
+    The exclusion check takes priority to prevent mid-level providers slipping through.
     """
-    for t in taxonomies:
-        if t.get("code") in PHYSICIAN_TAXONOMY_CODES:
-            return True
-    return False
+    if not taxonomies:
+        return False
+
+    codes = {t.get("code", "") for t in taxonomies}
+
+    # Explicit exclusion takes priority
+    if codes & NON_PHYSICIAN_TAXONOMY_CODES:
+        return False
+
+    # Must have at least one confirmed physician code
+    return bool(codes & PHYSICIAN_TAXONOMY_CODES)
 
 
 async def _query_nppes(
