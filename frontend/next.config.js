@@ -1,9 +1,6 @@
-/** @type {import('next').NextConfig} */ 
-const nextConfig = {}; 
-module.exports = nextConfig; 
-
-// next.config.js
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["leaflet"],
 };
+
 module.exports = nextConfig;

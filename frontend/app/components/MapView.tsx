@@ -5,7 +5,7 @@ import { Physician } from "../types";
 
 type MapViewProps = {
   center: [number, number];
-  trialLocations: { lat: number; log: number }[];
+  trialLocations: { lat: number; lon: number }[];
   physicians: Physician[];
   radius: number;
 };
@@ -55,8 +55,8 @@ function LeafletMap({ center, trialLocations, physicians, radius }: MapViewProps
       }).addTo(map);
 
       // Trial location markers (blue default)
-      trialLocations.forEach(({ lat, log }) => {
-        L.marker([lat, log])
+      trialLocations.forEach(({ lat, lon }) => {
+        L.marker([lat, lon])
           .addTo(map)
           .bindPopup("Trial Location");
       });
@@ -71,8 +71,8 @@ function LeafletMap({ center, trialLocations, physicians, radius }: MapViewProps
       });
 
       physicians.forEach((p) => {
-        if (p.lat && p.log) {
-          L.marker([p.lat, p.log], { icon: redIcon })
+        if (p.lat && p.lon) {
+          L.marker([p.lat, p.lon], { icon: redIcon })
             .addTo(map)
             .bindPopup(`<strong>${p.name}</strong><br/>${p.specialty ?? ""}`);
         }
