@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useTrials } from "./hooks/useTrials";
-import { usePhysicians } from "./hooks/usePhysicians";
 import TrialCard from "./components/TrialCard";
-import PhysicianCard from "./components/PhysicianCard";
-import { Physician, Trial } from "./types";
+import { Trial } from "./types";
 
 export default function Page() {
   const [condition, setCondition] = useState("");
@@ -31,45 +29,6 @@ export default function Page() {
     submitted ? (state || " ") : null,
     submitted ? otherTerms : undefined,
     undefined
-  );
-
-  const NON_US = [
-    "Israel", "Germany", "India", "Spain", "Italy", "Australia",
-    "Finland", "Poland", "Netherlands", "Sweden", "United Kingdom", "Canada", "France",
-  ];
-
-  const trialLocations = useMemo(() => {
-    if (!submitted) return null;
-
-    // If user typed a location manually, use that
-    if (city && state) return [{ city, state }];
-
-    // Otherwise extract US locations from all trial results
-    if (!trials || trials.length === 0) return null;
-
-    const locations: Array<{ city: string; state: string }> = [];
-
-    for (const trial of trials) {
-      for (const loc of (trial as any).locations ?? []) {
-        // loc is an object: { facility, city, state, country, status }
-        const country = loc.country ?? "";
-        const isNonUS = NON_US.some((c) => country.includes(c));
-        if (isNonUS) continue;
-
-        const locCity = loc.city ?? "";
-        const locState = loc.state ?? "";
-        if (locCity && locState) {
-          locations.push({ city: locCity, state: locState });
-        }
-      }
-    }
-
-    return locations.length > 0 ? locations : null;
-  }, [submitted, city, state, trials]);
-
-  const { physicians, loading: physiciansLoading } = usePhysicians(
-    submitted ? trialLocations : null,
-    submitted ? (condition || null) : null
   );
 
   const handleSearch = () => setSubmitted(true);
@@ -146,22 +105,16 @@ export default function Page() {
             <div className="space-y-1">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
-                  type="radio"
-                  name="studyStatus"
-                  value="all"
-                  checked={studyStatus === "all"}
-                  onChange={() => setStudyStatus("all")}
+                  type="radio" name="studyStatus" value="all"
+                  checked={studyStatus === "all"} onChange={() => setStudyStatus("all")}
                   className="accent-blue-600"
                 />
                 All studies
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
-                  type="radio"
-                  name="studyStatus"
-                  value="recruiting"
-                  checked={studyStatus === "recruiting"}
-                  onChange={() => setStudyStatus("recruiting")}
+                  type="radio" name="studyStatus" value="recruiting"
+                  checked={studyStatus === "recruiting"} onChange={() => setStudyStatus("recruiting")}
                   className="accent-blue-600"
                 />
                 Recruiting and not yet recruiting studies
@@ -182,25 +135,18 @@ export default function Page() {
               <div className="mt-3 space-y-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1">Age group</label>
-                  <select
-                    className="border rounded w-full p-2 text-sm"
-                    value={ageGroup}
-                    onChange={(e) => setAgeGroup(e.target.value)}
-                  >
+                  <select className="border rounded w-full p-2 text-sm" value={ageGroup}
+                    onChange={(e) => setAgeGroup(e.target.value)}>
                     <option value="">Any</option>
                     <option value="child">Child (birth–17)</option>
                     <option value="adult">Adult (18–64)</option>
                     <option value="older_adult">Older adult (65+)</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold mb-1">Study phase</label>
-                  <select
-                    className="border rounded w-full p-2 text-sm"
-                    value={phase}
-                    onChange={(e) => setPhase(e.target.value)}
-                  >
+                  <select className="border rounded w-full p-2 text-sm" value={phase}
+                    onChange={(e) => setPhase(e.target.value)}>
                     <option value="">Any</option>
                     <option value="early_phase1">Early Phase 1</option>
                     <option value="phase1">Phase 1</option>
@@ -216,10 +162,7 @@ export default function Page() {
         </div>
 
         <div className="bg-gray-50 px-4 py-3 flex justify-between items-center border-t">
-          <button
-            className="text-sm text-gray-500 hover:text-gray-700 underline"
-            onClick={handleReset}
-          >
+          <button className="text-sm text-gray-500 hover:text-gray-700 underline" onClick={handleReset}>
             Clear all
           </button>
           <button
@@ -240,28 +183,6 @@ export default function Page() {
       {submitted && !trialsLoading && trials.map((trial: Trial) => (
         <TrialCard key={trial.nctId} trial={trial} />
       ))}
-
-      {submitted && (
-        <div className="mt-8">
-          <h2 className="text-xl font-bold mb-1">Nearby Physicians</h2>
-          <p className="text-xs text-gray-400 mb-3">
-            {city && state
-              ? `Showing physicians in ${city}, ${state}`
-              : condition
-              ? `Showing specialists related to "${condition}" across trial locations`
-              : "Showing physicians across all trial locations"}
-          </p>
-          {physiciansLoading && (
-            <p className="text-sm text-gray-500">Loading physicians...</p>
-          )}
-          {!physiciansLoading && physicians.length === 0 && (
-            <p className="text-sm text-gray-500">No physicians found.</p>
-          )}
-          {!physiciansLoading && physicians.map((doctor: Physician) => (
-            <PhysicianCard key={doctor.npi} doctor={doctor} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
