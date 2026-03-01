@@ -23,10 +23,15 @@ STATE_ABBR = {
     "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC", "puerto rico": "PR",
 }
 
+# Only these credentials are considered actual physicians
+PHYSICIAN_CREDENTIALS = {
+    "MD", "DO", "MBBS", "MBChB", "DPM", "DMD", "DDS", "OD",
+    "MD PHD", "DO FACP", "MD FACP", "MD FACS", "MD PHD FACP",
+}
+
 # Maps condition keywords to prioritized NPPES taxonomy_description values.
-# NPPES accepts partial taxonomy_description matches, so "Oncology" matches
-# "Hematology & Oncology", "Medical Oncology", "Radiation Oncology", etc.
-# Order matters: most relevant first. We query each in turn until limit is met.
+# NPPES does partial substring matching on taxonomy_description.
+# Order matters: most relevant first.
 CONDITION_TO_TAXONOMY_QUERIES = {
     "breast cancer": ["Oncology", "Hematology", "Radiation Oncology", "Surgical Oncology"],
     "cancer":        ["Oncology", "Hematology", "Radiation Oncology", "Surgical Oncology"],
@@ -98,7 +103,6 @@ CONDITION_TO_TAXONOMY_QUERIES = {
     # Urology
     "bladder":       ["Urology"],
     "urothelial":    ["Urology", "Oncology"],
-    "kidney":        ["Nephrology", "Urology"],
     # Ophthalmology
     "retina":        ["Ophthalmology"],
     "macular":       ["Ophthalmology"],
@@ -130,6 +134,21 @@ def normalize_state(state: str) -> str | None:
     if len(s) == 2:
         return s.upper()
     return STATE_ABBR.get(s.lower(), s.upper())
+
+
+def _is_physician(basic: dict) -> bool:
+    """Return True only if the provider's credential indicates an actual physician."""
+    raw = basic.get("credential", "") or ""
+    # Normalize: uppercase, remove dots and extra spaces
+    credential = raw.strip().upper().replace(".", "").replace(",", "").strip()
+    # Direct match
+    if credential in PHYSICIAN_CREDENTIALS:
+        return True
+    # Starts-with match to handle suffixes like "MD FACC", "DO MPH", etc.
+    for valid in PHYSICIAN_CREDENTIALS:
+        if credential.startswith(valid):
+            return True
+    return False
 
 
 async def _query_nppes(
@@ -171,23 +190,51 @@ async def _query_nppes(
     return raw
 
 
-def _parse_physician(item: dict) -> dict | None:
-    """Extract structured physician info. Returns None if address is missing."""
+def _parse_physician(
+    item: dict,
+    expected_city: str | None = None,
+) -> dict | None:
+    """
+    Extract structured physician info from a raw NPPES result.
+    Returns None if:
+      - provider is not a physician (MD/DO/etc.)
+      - practice address is missing
+      - city doesn't match expected_city (when provided)
+    """
     basic = item.get("basic", {})
     addresses = item.get("addresses", [])
     taxonomies = item.get("taxonomies", [])
 
-    primary_taxonomy = next(
-        (t for t in taxonomies if t.get("primary")),
-        taxonomies[0] if taxonomies else {}
-    )
-    specialty_desc = primary_taxonomy.get("desc") or basic.get("credential") or "Unknown"
+    # ✅ Only include actual physicians
+    if not _is_physician(basic):
+        logger.debug(
+            f"Skipping non-physician: {basic.get('first_name')} {basic.get('last_name')} "
+            f"(credential={basic.get('credential')})"
+        )
+        return None
 
     practice_address = next(
         (a for a in addresses if a.get("address_purpose") == "LOCATION"), None
     )
     if not practice_address:
         return None
+
+    # ✅ Only include physicians in the expected city
+    if expected_city:
+        provider_city = (practice_address.get("city") or "").strip().lower()
+        if provider_city != expected_city.strip().lower():
+            logger.debug(
+                f"Skipping out-of-area physician: "
+                f"{basic.get('first_name')} {basic.get('last_name')} "
+                f"(city={provider_city}, expected={expected_city})"
+            )
+            return None
+
+    primary_taxonomy = next(
+        (t for t in taxonomies if t.get("primary")),
+        taxonomies[0] if taxonomies else {}
+    )
+    specialty_desc = primary_taxonomy.get("desc") or basic.get("credential") or "Unknown"
 
     full_address = (
         f"{practice_address.get('address_1', '')}, "
@@ -199,6 +246,7 @@ def _parse_physician(item: dict) -> dict | None:
     return {
         "npi": item.get("number"),
         "name": f"{basic.get('first_name', '')} {basic.get('last_name', '')}".strip(),
+        "credential": basic.get("credential", ""),
         "city": practice_address.get("city"),
         "state": practice_address.get("state"),
         "address": practice_address.get("address_1"),
@@ -226,42 +274,66 @@ async def fetch_physicians_near(
     physicians_to_geocode: list = []
 
     if taxonomy_queries:
-        # Query NPPES once per taxonomy type, stopping when we reach the limit.
-        # Querying at the API level (taxonomy_description param) is far more reliable
-        # than fetching generic results and post-filtering.
+        # Query NPPES once per taxonomy, filtering at API level.
+        # Fetch extra to account for non-physician and out-of-area filtering.
         for taxonomy in taxonomy_queries:
             if len(physicians_to_geocode) >= limit:
                 break
-            needed = limit - len(physicians_to_geocode)
-            raw_results = await _query_nppes(city, state_code, needed + 5, taxonomy)
+            raw_results = await _query_nppes(city, state_code, limit * 4, taxonomy)
             for item in raw_results:
                 npi = item.get("number")
                 if npi in seen_npis:
                     continue
                 seen_npis.add(npi)
-                parsed = _parse_physician(item)
+                parsed = _parse_physician(item, expected_city=city)
                 if parsed:
                     physicians_to_geocode.append(parsed)
                 if len(physicians_to_geocode) >= limit:
                     break
 
-        # Fallback: if no specialty results found, fetch without filter
+        # Fallback 1: relax city filter — search by state only
+        if not physicians_to_geocode and state_code:
+            logger.warning(
+                f"No physicians found in city={city}. "
+                f"Falling back to state={state_code} search."
+            )
+            for taxonomy in taxonomy_queries:
+                if len(physicians_to_geocode) >= limit:
+                    break
+                raw_results = await _query_nppes(None, state_code, limit * 4, taxonomy)
+                for item in raw_results:
+                    npi = item.get("number")
+                    if npi in seen_npis:
+                        continue
+                    seen_npis.add(npi)
+                    parsed = _parse_physician(item, expected_city=None)
+                    if parsed:
+                        physicians_to_geocode.append(parsed)
+                    if len(physicians_to_geocode) >= limit:
+                        break
+
+        # Fallback 2: drop specialty filter entirely
         if not physicians_to_geocode:
             logger.warning(
-                f"No results for taxonomy queries {taxonomy_queries} in "
-                f"city={city}, state={state_code}. Falling back to unfiltered."
+                f"No physicians found with taxonomy filter. "
+                f"Falling back to unfiltered search."
             )
-            raw_results = await _query_nppes(city, state_code, limit)
+            raw_results = await _query_nppes(city, state_code, limit * 4)
             for item in raw_results:
-                parsed = _parse_physician(item)
+                parsed = _parse_physician(item, expected_city=city)
                 if parsed:
                     physicians_to_geocode.append(parsed)
+                if len(physicians_to_geocode) >= limit:
+                    break
+
     else:
-        raw_results = await _query_nppes(city, state_code, limit)
+        raw_results = await _query_nppes(city, state_code, limit * 4)
         for item in raw_results:
-            parsed = _parse_physician(item)
+            parsed = _parse_physician(item, expected_city=city)
             if parsed:
                 physicians_to_geocode.append(parsed)
+            if len(physicians_to_geocode) >= limit:
+                break
 
     logger.info(f"Found {len(physicians_to_geocode)} physicians before geocoding.")
 
