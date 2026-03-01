@@ -23,66 +23,102 @@ STATE_ABBR = {
     "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC", "puerto rico": "PR",
 }
 
-CONDITION_TO_SPECIALTY = {
-    # Endocrine
-    "diabetes": "Endocrinology", "thyroid": "Endocrinology", "obesity": "Endocrinology",
-    "metabolic": "Endocrinology", "hormonal": "Endocrinology",
+# Maps condition keywords to a list of NPPES taxonomy description substrings to match against.
+# Broader lists = more physicians returned.
+CONDITION_TO_SPECIALTY_KEYWORDS = {
+    # Oncology — many specialists treat cancer patients
+    "cancer": ["oncol", "hematol", "radiation", "surgical oncol", "gynecologic oncol", "neuro-oncol", "breast"],
+    "tumor": ["oncol", "hematol", "radiation", "neurosurg", "surgical oncol"],
+    "lymphoma": ["oncol", "hematol"],
+    "leukemia": ["oncol", "hematol"],
+    "melanoma": ["oncol", "dermatol"],
+    "carcinoma": ["oncol", "hematol", "radiation", "surgical oncol"],
+    "neoplasm": ["oncol", "hematol"],
+    "breast cancer": ["oncol", "hematol", "breast", "radiation", "surgical oncol"],
+    "prostate": ["oncol", "urol", "radiation"],
+    "lung cancer": ["oncol", "pulmon", "radiation", "thoracic"],
     # Cardiovascular
-    "heart": "Cardiology", "cardiac": "Cardiology", "cardiovascular": "Cardiology",
-    "hypertension": "Cardiology", "arrhythmia": "Cardiology", "stroke": "Cardiology",
-    "coronary": "Cardiology",
-    # Oncology
-    "cancer": "Oncology", "tumor": "Oncology", "lymphoma": "Oncology",
-    "leukemia": "Oncology", "melanoma": "Oncology", "carcinoma": "Oncology",
-    "neoplasm": "Oncology",
+    "heart": ["cardiol", "cardiovascular", "cardiac", "internal medicine", "electrophysiol"],
+    "cardiac": ["cardiol", "cardiovascular", "cardiac", "electrophysiol"],
+    "cardiovascular": ["cardiol", "cardiovascular", "cardiac"],
+    "hypertension": ["cardiol", "internal medicine", "nephrol"],
+    "arrhythmia": ["cardiol", "electrophysiol"],
+    "stroke": ["neurol", "cardiol", "vascular"],
+    "coronary": ["cardiol", "cardiovascular"],
+    # Endocrine
+    "diabetes": ["endocrinol", "internal medicine", "metabolic"],
+    "thyroid": ["endocrinol"],
+    "obesity": ["endocrinol", "internal medicine", "bariatric"],
+    "metabolic": ["endocrinol", "internal medicine"],
+    "hormonal": ["endocrinol", "reproductive"],
     # Neurology
-    "alzheimer": "Neurology", "parkinson": "Neurology", "epilepsy": "Neurology",
-    "seizure": "Neurology", "migraine": "Neurology", "cluster headache": "Neurology",
-    "multiple sclerosis": "Neurology", "neuropathy": "Neurology", "dystonia": "Neurology",
+    "alzheimer": ["neurol", "geriatric", "psychiatr"],
+    "parkinson": ["neurol"],
+    "epilepsy": ["neurol"],
+    "seizure": ["neurol"],
+    "migraine": ["neurol"],
+    "multiple sclerosis": ["neurol"],
+    "neuropathy": ["neurol"],
     # Pulmonology
-    "asthma": "Pulmonology", "copd": "Pulmonology", "lung": "Pulmonology",
-    "respiratory": "Pulmonology",
+    "asthma": ["pulmon", "allerg", "internal medicine"],
+    "copd": ["pulmon", "internal medicine"],
+    "lung": ["pulmon", "thoracic", "internal medicine"],
+    "respiratory": ["pulmon", "internal medicine"],
     # Gastroenterology
-    "crohn": "Gastroenterology", "colitis": "Gastroenterology", "ibd": "Gastroenterology",
-    "hepatitis": "Gastroenterology", "liver": "Gastroenterology",
-    "gastrointestinal": "Gastroenterology", "esophageal": "Gastroenterology",
-    "colorectal": "Gastroenterology", "pancreatic": "Gastroenterology",
-    "gallbladder": "Gastroenterology",
+    "crohn": ["gastroenterol", "internal medicine"],
+    "colitis": ["gastroenterol", "internal medicine"],
+    "hepatitis": ["gastroenterol", "hepatol", "internal medicine"],
+    "liver": ["gastroenterol", "hepatol"],
+    "colorectal": ["gastroenterol", "colorectal", "surgical"],
+    "pancreatic": ["gastroenterol", "oncol", "surgical"],
     # Rheumatology
-    "arthritis": "Rheumatology", "lupus": "Rheumatology",
-    "rheumatoid": "Rheumatology", "fibromyalgia": "Rheumatology",
+    "arthritis": ["rheumatol", "internal medicine", "orthop"],
+    "lupus": ["rheumatol", "internal medicine"],
+    "rheumatoid": ["rheumatol"],
+    "fibromyalgia": ["rheumatol", "pain"],
     # Psychiatry
-    "depression": "Psychiatry", "anxiety": "Psychiatry", "schizophrenia": "Psychiatry",
-    "bipolar": "Psychiatry", "ptsd": "Psychiatry", "adhd": "Psychiatry",
-    "mental": "Psychiatry",
+    "depression": ["psychiatr", "psychol", "mental health"],
+    "anxiety": ["psychiatr", "psychol", "mental health"],
+    "schizophrenia": ["psychiatr"],
+    "bipolar": ["psychiatr"],
+    "ptsd": ["psychiatr", "psychol"],
+    "adhd": ["psychiatr", "psychol", "pediatr"],
     # Orthopedics
-    "disc": "Orthopedic Surgery", "spine": "Orthopedic Surgery",
-    "spondylolisthesis": "Orthopedic Surgery", "degenerative": "Orthopedic Surgery",
-    "fracture": "Orthopedic Surgery", "joint": "Orthopedic Surgery",
+    "spine": ["orthop", "neurosurg", "physical medicine"],
+    "fracture": ["orthop", "trauma"],
+    "joint": ["orthop", "rheumatol"],
     # Infectious Disease
-    "hiv": "Infectious Disease", "aids": "Infectious Disease",
-    "hepatitis c": "Infectious Disease", "infection": "Infectious Disease",
+    "hiv": ["infectious", "internal medicine"],
+    "aids": ["infectious", "internal medicine"],
+    "infection": ["infectious", "internal medicine"],
     # Urology
-    "urothelial": "Urology", "bladder": "Urology", "renal": "Urology",
-    "kidney": "Urology", "prostate": "Urology",
+    "bladder": ["urol"],
+    "renal": ["nephrol", "urol"],
+    "kidney": ["nephrol", "urol"],
     # Ophthalmology
-    "retina": "Ophthalmology", "macular": "Ophthalmology", "glaucoma": "Ophthalmology",
-    "ocular": "Ophthalmology", "eye": "Ophthalmology",
+    "retina": ["ophthal"],
+    "macular": ["ophthal"],
+    "glaucoma": ["ophthal"],
+    "eye": ["ophthal"],
 }
 
 
-def map_condition_to_specialty(condition: str) -> str | None:
+def map_condition_to_specialty_keywords(condition: str) -> list[str]:
+    """
+    Returns a list of lowercase substrings to match against NPPES taxonomy descriptions.
+    Broader matching = more physicians returned.
+    """
     if not condition:
-        return None
+        return []
     condition_lower = condition.lower().strip()
-    # Sort by length descending so "hepatitis c" matches before "hepatitis"
-    for keyword in sorted(CONDITION_TO_SPECIALTY.keys(), key=len, reverse=True):
+    # Sort by length descending so "breast cancer" matches before "cancer"
+    for keyword in sorted(CONDITION_TO_SPECIALTY_KEYWORDS.keys(), key=len, reverse=True):
         if keyword in condition_lower:
-            specialty = CONDITION_TO_SPECIALTY[keyword]
-            logger.info(f"Mapped condition '{condition}' → specialty '{specialty}'")
-            return specialty
-    logger.info(f"No specialty mapping found for '{condition}' — fetching all specialties.")
-    return None
+            keywords = CONDITION_TO_SPECIALTY_KEYWORDS[keyword]
+            logger.info(f"Mapped condition '{condition}' → specialty keywords {keywords}")
+            return keywords
+    logger.info(f"No specialty mapping for '{condition}' — returning all physicians.")
+    return []
 
 
 def normalize_state(state: str) -> str | None:
@@ -97,6 +133,7 @@ def normalize_state(state: str) -> str | None:
 
 
 async def _query_nppes(city: str | None, state: str | None, limit: int) -> list:
+    """Query NPPES API and return raw results."""
     params = {
         "version": "2.1",
         "enumeration_type": "NPI-1",
@@ -120,7 +157,7 @@ async def _query_nppes(city: str | None, state: str | None, limit: int) -> list:
         return []
 
     raw = data.get("results", [])
-    logger.info(f"NPPES returned {len(raw)} results (city={city}, state={state})")
+    logger.info(f"NPPES returned {len(raw)} raw results (city={city}, state={state})")
     if not raw:
         logger.warning(f"Empty NPPES response. Full payload: {data}")
     return raw
@@ -133,15 +170,20 @@ async def fetch_physicians_near(
     limit: int = 10,
 ) -> list:
     state_code = normalize_state(state) if state else None
-    specialty = map_condition_to_specialty(condition) if condition else None
+    specialty_keywords = map_condition_to_specialty_keywords(condition) if condition else []
 
-    logger.info(f"Fetching physicians: city={city}, state={state_code}, condition={condition}, specialty={specialty}")
+    logger.info(
+        f"Fetching physicians: city={city}, state={state_code}, "
+        f"condition={condition}, specialty_keywords={specialty_keywords}"
+    )
 
-    raw_results = await _query_nppes(city, state_code, limit)
+    # Fetch more from NPPES than needed so filtering doesn't leave us empty
+    fetch_limit = min(limit * 5, 200)
+    raw_results = await _query_nppes(city, state_code, fetch_limit)
+
     if not raw_results:
         return []
 
-    specialty_lower = specialty.lower().strip() if specialty else None
     physicians_to_geocode = []
 
     for item in raw_results:
@@ -149,9 +191,12 @@ async def fetch_physicians_near(
         addresses = item.get("addresses", [])
         taxonomies = item.get("taxonomies", [])
 
-        if specialty_lower:
+        # Filter by specialty keywords if we have them
+        if specialty_keywords:
             taxonomy_descs = [(t.get("desc") or "").lower() for t in taxonomies]
-            if not any(specialty_lower in desc for desc in taxonomy_descs):
+            all_descs = " ".join(taxonomy_descs)
+            if not any(kw in all_descs for kw in specialty_keywords):
+                logger.debug(f"Skipping physician — no specialty match. Taxonomies: {taxonomy_descs}")
                 continue
 
         primary_taxonomy = next(
@@ -184,7 +229,19 @@ async def fetch_physicians_near(
             "full_address": full_address,
         })
 
-    # Geocode all concurrently instead of serially
+        # Stop once we have enough
+        if len(physicians_to_geocode) >= limit:
+            break
+
+    logger.info(f"After specialty filter: {len(physicians_to_geocode)} physicians to geocode.")
+
+    if not physicians_to_geocode:
+        logger.warning(
+            f"No physicians matched specialty keywords {specialty_keywords} "
+            f"in {len(raw_results)} NPPES results for city={city}, state={state_code}."
+        )
+        return []
+
     async def geocode_physician(p: dict) -> dict:
         try:
             geo = await geocode_address(p["full_address"])
