@@ -25,36 +25,44 @@ STATE_MAP = {
     "WI": "Wisconsin", "WY": "Wyoming", "DC": "District of Columbia",
 }
 
+# Maps broad user-entered terms to precise ClinicalTrials condition keywords
+CONDITION_SYNONYMS = {
+    "oncology": "cancer OR tumor OR carcinoma OR malignancy OR neoplasm OR sarcoma OR lymphoma OR leukemia OR melanoma",
+    "heart disease": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia",
+    "diabetes": "diabetes mellitus OR diabetic OR hyperglycemia",
+    "obesity": "obesity OR overweight OR bariatric",
+    "mental health": "depression OR anxiety OR bipolar OR schizophrenia OR PTSD OR psychiatric",
+}
+
+
+def _expand_condition(condition: str) -> str:
+    """Map common broad terms to more precise condition search strings."""
+    if not condition or not condition.strip():
+        return condition
+    lower = condition.lower().strip()
+    return CONDITION_SYNONYMS.get(lower, condition)
+
 
 def _expand_location(location: str) -> str | None:
-    """
-    Takes a location string like 'TX', 'Dallas, TX', or 'Texas' and
-    returns a fully expanded string for the ClinicalTrials API.
-    """
     if not location or not location.strip():
         return None
-
     parts = [p.strip() for p in location.split(",")]
-
-    # Expand any part that is a 2-letter state abbreviation
     expanded_parts = []
     for part in parts:
         expanded_parts.append(STATE_MAP.get(part.upper(), part))
-
     result = ", ".join(expanded_parts)
-
-    # Append United States if not already present
     if "united states" not in result.lower():
         result = f"{result}, United States"
-
     return result
 
 
 def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: int = 0):
     location_query = _expand_location(location)
+    condition_query = _expand_condition(condition)
 
     params = {
-        "query.cond": condition,
+        # ✅ Use query.cond to restrict search to condition/disease field only
+        "query.cond": condition_query,
         "pageSize": limit,
         "countTotal": "true",
         "format": "json",
@@ -82,10 +90,30 @@ def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: in
         return []
 
     studies = data.get("studies", [])
-    logger.info(f"ClinicalTrials returned {len(studies)} studies | condition={condition} | location={location_query}")
+    logger.info(f"ClinicalTrials returned {len(studies)} studies | condition={condition_query} | location={location_query}")
+
+    # ✅ Post-filter: ensure at least one returned condition loosely matches the search term
+    filtered_studies = []
+    search_keywords = _get_filter_keywords(condition)
+    for study in studies:
+        protocol = study.get("protocolSection", {})
+        study_conditions = [
+            c.lower()
+            for c in protocol.get("conditionsModule", {}).get("conditions", [])
+        ]
+        if search_keywords and not any(
+            kw in cond
+            for kw in search_keywords
+            for cond in study_conditions
+        ):
+            logger.debug(f"Filtered out study with conditions: {study_conditions}")
+            continue
+        filtered_studies.append(study)
+
+    logger.info(f"After post-filter: {len(filtered_studies)} studies remain")
 
     results = []
-    for study in studies:
+    for study in filtered_studies:
         protocol = study.get("protocolSection", {})
 
         locations_module = protocol.get("contactsLocationsModule", {})
@@ -140,6 +168,33 @@ def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: in
         })
 
     return results
+
+
+def _get_filter_keywords(condition: str) -> list[str]:
+    """
+    Returns a list of lowercase keywords that at least one study condition must contain.
+    For broad terms like 'oncology', returns cancer-related keywords.
+    For specific terms, returns the term itself.
+    """
+    if not condition:
+        return []
+    lower = condition.lower().strip()
+
+    KEYWORD_MAP = {
+        "oncology": ["cancer", "tumor", "carcinoma", "malignancy", "neoplasm",
+                     "sarcoma", "lymphoma", "leukemia", "melanoma", "glioma",
+                     "myeloma", "adenocarcinoma", "blastoma"],
+        "heart disease": ["cardiac", "cardiovascular", "coronary", "heart", "arrhythmia"],
+        "diabetes": ["diabet", "hyperglycemi", "insulin"],
+        "obesity": ["obes", "overweight", "adipos", "bariatric"],
+        "mental health": ["depress", "anxiety", "bipolar", "schizophreni", "ptsd", "psychiat"],
+    }
+
+    if lower in KEYWORD_MAP:
+        return KEYWORD_MAP[lower]
+
+    # For any other term, just use the term itself as the filter keyword
+    return [lower]
 
 
 def _get_page_token(base_params: dict, offset: int) -> str | None:
