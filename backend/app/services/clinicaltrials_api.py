@@ -25,7 +25,6 @@ STATE_MAP = {
     "WI": "Wisconsin", "WY": "Wyoming", "DC": "District of Columbia",
 }
 
-# Maps broad user-entered terms to precise ClinicalTrials condition keywords
 CONDITION_SYNONYMS = {
     "oncology": "cancer OR tumor OR carcinoma OR malignancy OR neoplasm OR sarcoma OR lymphoma OR leukemia OR melanoma",
     "heart disease": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia",
@@ -36,7 +35,6 @@ CONDITION_SYNONYMS = {
 
 
 def _expand_condition(condition: str) -> str:
-    """Map common broad terms to more precise condition search strings."""
     if not condition or not condition.strip():
         return condition
     lower = condition.lower().strip()
@@ -56,12 +54,20 @@ def _expand_location(location: str) -> str | None:
     return result
 
 
-def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: int = 0):
+def fetch_trials(
+    condition: str,
+    location: str = "",
+    limit: int = 10,
+    offset: int = 0,
+) -> tuple[list, int]:
+    """
+    Returns a tuple of (results, total_count).
+    total_count is the full number of matching studies from the API.
+    """
     location_query = _expand_location(location)
     condition_query = _expand_condition(condition)
 
     params = {
-        # ✅ Use query.cond to restrict search to condition/disease field only
         "query.cond": condition_query,
         "pageSize": limit,
         "countTotal": "true",
@@ -84,17 +90,22 @@ def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: in
         data = response.json()
     except requests.HTTPError as e:
         logger.error(f"ClinicalTrials HTTP error: {e.response.status_code}")
-        return []
+        return [], 0
     except requests.RequestException as e:
         logger.error(f"ClinicalTrials request failed: {e}")
-        return []
+        return [], 0
 
     studies = data.get("studies", [])
-    logger.info(f"ClinicalTrials returned {len(studies)} studies | condition={condition_query} | location={location_query}")
+    # ✅ Capture the real total count from the API response
+    total_count = data.get("totalCount", len(studies))
 
-    # ✅ Post-filter: ensure at least one returned condition loosely matches the search term
-    filtered_studies = []
+    logger.info(
+        f"ClinicalTrials returned {len(studies)} studies (total={total_count}) "
+        f"| condition={condition_query} | location={location_query}"
+    )
+
     search_keywords = _get_filter_keywords(condition)
+    filtered_studies = []
     for study in studies:
         protocol = study.get("protocolSection", {})
         study_conditions = [
@@ -167,15 +178,10 @@ def fetch_trials(condition: str, location: str = "", limit: int = 10, offset: in
             "pointOfContact": point_of_contact,
         })
 
-    return results
+    return results, total_count
 
 
 def _get_filter_keywords(condition: str) -> list[str]:
-    """
-    Returns a list of lowercase keywords that at least one study condition must contain.
-    For broad terms like 'oncology', returns cancer-related keywords.
-    For specific terms, returns the term itself.
-    """
     if not condition:
         return []
     lower = condition.lower().strip()
@@ -193,7 +199,6 @@ def _get_filter_keywords(condition: str) -> list[str]:
     if lower in KEYWORD_MAP:
         return KEYWORD_MAP[lower]
 
-    # For any other term, just use the term itself as the filter keyword
     return [lower]
 
 

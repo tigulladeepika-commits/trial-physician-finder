@@ -17,7 +17,9 @@ async def get_trials(
     location = ", ".join(filter(None, [city.strip(), state.strip()]))
 
     loop = asyncio.get_running_loop()
-    trials = await loop.run_in_executor(
+
+    # ✅ fetch_trials now returns (results, total_count)
+    trials, total_count = await loop.run_in_executor(
         None, fetch_trials, condition, location, limit, offset
     )
 
@@ -29,6 +31,9 @@ async def get_trials(
         "pagination": {
             "limit": limit,
             "offset": offset,
-            "total": len(trials),
+            # ✅ Real total from API, not just current page length
+            "total": total_count,
+            "page": (offset // limit) + 1 if limit > 0 else 1,
+            "has_more": (offset + limit) < total_count,
         },
     }
