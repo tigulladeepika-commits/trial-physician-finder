@@ -10,8 +10,10 @@
     "vercel-build": "next build"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.21",
     "autoprefixer": "10.4.14",
     "axios": "^1.5.0",
+    "leaflet": "^1.9.4",
     "next": "13.5.10",
     "postcss": "8.4.21",
     "react": "18.2.0",
