@@ -45,11 +45,18 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
   const mapInstance = useRef<any>(null);
   const circleRef = useRef<any>(null);
   const [radius, setRadius] = useState(50);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const firstUsLoc = trial.locations?.find(l => l.lat && l.lon && l.country === "United States");
   const center: [number, number] = firstUsLoc ? [firstUsLoc.lat!, firstUsLoc.lon!] : [39.5, -98.35];
 
   useEffect(() => {
+    if (!isClient) return;
+
     let cancelled = false;
 
     const init = async () => {
@@ -76,7 +83,6 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
       });
       mapInstance.current = map;
 
-      // Trial site markers (blue default MQ marker)
       for (const loc of trial.locations ?? []) {
         if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
         L.marker([loc.lat, loc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#1a56db", secondaryColor: "#bfdbfe", size: "sm" }) })
@@ -90,7 +96,6 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
           `);
       }
 
-      // Physician markers (green)
       for (const doc of physicians) {
         if (!doc.lat || !doc.lon) continue;
         L.marker([doc.lat, doc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#16a34a", secondaryColor: "#bbf7d0", size: "sm" }) })
@@ -105,7 +110,6 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
           `);
       }
 
-      // Radius circle
       circleRef.current = L.circle(center, {
         radius: radius * 1000,
         color: "#1a56db",
@@ -124,12 +128,23 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         circleRef.current = null;
       }
     };
-  }, [trial, physicians]);
+  }, [trial, physicians, isClient]);
 
   useEffect(() => {
     if (!circleRef.current) return;
     circleRef.current.setRadius(radius * 1000);
   }, [radius]);
+
+  if (!isClient) {
+    return (
+      <div style={{ border: "1px solid #e8eaed", borderRadius: "10px", overflow: "hidden" }}>
+        <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "16px" }}>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>🗺️ Map View</span>
+        </div>
+        <div style={{ height: "400px", background: "#f1f5f9" }} className="animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ border: "1px solid #e8eaed", borderRadius: "10px", overflow: "hidden" }}>
