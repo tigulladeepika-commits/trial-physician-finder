@@ -7,13 +7,6 @@ type Props = {
   trials: Trial[];
 };
 
-declare global {
-  interface Window {
-    L: any;
-    MQ: any;
-  }
-}
-
 export default function TrialMap({ trials }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -21,46 +14,20 @@ export default function TrialMap({ trials }: Props) {
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
-    const key = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
+    (async () => {
+      const L = (await import("leaflet")).default;
+      await import("leaflet/dist/leaflet.css");
 
-    const loadMapQuest = () =>
-      new Promise<void>((resolve) => {
-        if (window.L && window.MQ) { resolve(); return; }
-
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.css";
-        document.head.appendChild(link);
-
-        const script = document.createElement("script");
-        script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
-        script.onload = () => {
-          const interval = setInterval(() => {
-            if (window.MQ && window.L) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 50);
-        };
-        script.onerror = () => console.error("Failed to load MapQuest script");
-        document.head.appendChild(script);
-      });
-
-    loadMapQuest().then(() => {
-      const container = document.getElementById("trial-overview-map");
+      const container = mapRef.current;
       if (!container) return;
-      if ((container as any)._leaflet_id) {
-        (container as any)._leaflet_id = undefined;
-      }
+      if ((container as any)._leaflet_id) return;
 
-      window.MQ.key = key;
-
-      const map = window.MQ.map("trial-overview-map", {
-        center: [39.5, -98.35],
-        zoom: 4,
-      });
-
+      const map = L.map(container).setView([39.5, -98.35], 4);
       mapInstance.current = map;
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
 
       const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
 
@@ -77,26 +44,34 @@ export default function TrialMap({ trials }: Props) {
         }
       }
 
+      // Fix default marker icons
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+
       for (const p of points) {
-        const marker = window.MQ.marker([p.lat, p.lon]).addTo(map);
-        marker.bindPopup(`
-          <div style="max-width:200px">
-            <strong style="font-size:12px">${p.nctId}</strong><br/>
-            <span style="font-size:11px">${p.title.slice(0, 80)}${p.title.length > 80 ? "..." : ""}</span>
-          </div>
-        `);
+        L.marker([p.lat, p.lon])
+          .addTo(map)
+          .bindPopup(`
+            <div style="max-width:200px">
+              <strong style="font-size:12px">${p.nctId}</strong><br/>
+              <span style="font-size:11px">${p.title.slice(0, 80)}${p.title.length > 80 ? "..." : ""}</span>
+            </div>
+          `);
       }
 
       if (points.length > 0) {
         const lats = points.map((p) => p.lat);
         const lons = points.map((p) => p.lon);
-        const bounds = window.L.latLngBounds(
+        map.fitBounds([
           [Math.min(...lats) - 1, Math.min(...lons) - 1],
-          [Math.max(...lats) + 1, Math.max(...lons) + 1]
-        );
-        map.fitBounds(bounds);
+          [Math.max(...lats) + 1, Math.max(...lons) + 1],
+        ]);
       }
-    });
+    })();
 
     return () => {
       if (mapInstance.current) {
@@ -114,7 +89,7 @@ export default function TrialMap({ trials }: Props) {
           Showing US locations for {trials.length} trial{trials.length !== 1 ? "s" : ""}
         </span>
       </div>
-      <div id="trial-overview-map" ref={mapRef} style={{ height: "350px", width: "100%" }} />
+      <div ref={mapRef} style={{ height: "350px", width: "100%" }} />
     </div>
   );
 }
