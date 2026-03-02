@@ -18,7 +18,7 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
   const mapId = `trial-physician-map-${trial.nctId}`;
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_MAPQUEST_KEY;
+    const key = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
     if (!key || !mapRef.current) return;
 
     const loadMapQuest = () =>
