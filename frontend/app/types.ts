@@ -1,64 +1,46 @@
-export type Trial = {
-  nctId: string;
-  title: string;
+export interface TrialLocation {
+  facility?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  status?: string;
+  lat?: number;
+  lon?: number;
+}
+
+export interface PointOfContact {
+  name?: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface Trial {
+  nctId?: string;
+  title?: string;
   status: string;
   description?: string;
   conditions?: string[];
   sponsor?: string;
   phases?: string[];
-  locations?: {
-    facility?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    status?: string;
-    lat?: number;
-    lon?: number;
-  }[];
+  locations?: TrialLocation[];
   inclusionCriteria?: string;
   exclusionCriteria?: string;
-  pointOfContact?: {
-    name?: string;
-    role?: string;
-    phone?: string;
-    email?: string;
-  } | null;
-  physicians?: {
-    npi: string;
-    name: string;
-    specialty?: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    postal_code?: string;
-    distance_km?: number | null;
-  }[];
-  contactsLocationsModule?: {
-    locations?: {
-      geoPoint?: { lat?: number; lon?: number };
-      facility?: string;
-      city?: string;
-      state?: string;
-      country?: string;
-    }[];
-    centralContacts?: {
-      name?: string;
-      role?: string;
-      phone?: string;
-      email?: string;
-    }[];
-  };
-};
+  pointOfContact?: PointOfContact;
+}
 
-export type Physician = {
+export interface Physician {
   npi: string;
   name: string;
-  specialty?: string;
-  address?: string;
+  credential?: string;           // e.g. "MD", "DO"
   city?: string;
   state?: string;
+  address?: string;
   postal_code?: string;
-  distance_km?: number | null;
+  specialty?: string;
+  taxonomyCode?: string;         // e.g. "207RH0003X"
+  taxonomyDescription?: string;  // e.g. "Hematology & Oncology"
   lat?: number;
   lon?: number;
-};
+  distance_km?: number;
+}

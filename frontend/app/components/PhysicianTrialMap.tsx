@@ -8,109 +8,123 @@ type Props = {
   physicians: Physician[];
 };
 
+const MQ_KEY = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
+
+declare global {
+  interface Window { L: any; MQ: any; }
+}
+
+function loadMapQuest(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.MQ && window.L) { resolve(); return; }
+
+    const existing = document.querySelector('script[src*="mapquest"]');
+    if (!existing) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.css";
+      document.head.appendChild(link);
+
+      const script = document.createElement("script");
+      script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
+      document.head.appendChild(script);
+    }
+
+    const interval = setInterval(() => {
+      if (window.MQ && window.L) {
+        clearInterval(interval);
+        window.MQ.key = MQ_KEY;
+        resolve();
+      }
+    }, 50);
+  });
+}
+
 export default function PhysicianTrialMap({ trial, physicians }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const circleRef = useRef<any>(null);
   const [radius, setRadius] = useState(50);
 
+  const firstUsLoc = trial.locations?.find(l => l.lat && l.lon && l.country === "United States");
+  const center: [number, number] = firstUsLoc ? [firstUsLoc.lat!, firstUsLoc.lon!] : [39.5, -98.35];
+
   useEffect(() => {
-    if (!mapRef.current || mapInstance.current) return;
+    let cancelled = false;
 
-    (async () => {
-      const L = (await import("leaflet")).default;
-      await import("leaflet/dist/leaflet.css");
+    const init = async () => {
+      await loadMapQuest();
+      if (cancelled || !mapRef.current) return;
 
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        circleRef.current = null;
+      }
       const container = mapRef.current;
-      if (!container) return;
-      if ((container as any)._leaflet_id) return;
+      if ((container as any)._leaflet_id) {
+        (container as any)._leaflet_id = undefined;
+      }
 
-      // Fix default marker icons
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      const L = window.L;
+      window.MQ.key = MQ_KEY;
+
+      const map = L.mapquest.map(container, {
+        center,
+        layers: L.mapquest.tileLayer("map"),
+        zoom: 8,
       });
-
-      const firstLoc = trial.locations?.find(
-        (l) => l.lat && l.lon && l.country === "United States"
-      );
-      const center: [number, number] = firstLoc?.lat && firstLoc?.lon
-        ? [firstLoc.lat, firstLoc.lon]
-        : [39.5, -98.35];
-
-      const map = L.map(container).setView(center, 7);
       mapInstance.current = map;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(map);
-
-      // Trial location markers (blue)
-      const blueIcon = L.icon({
-        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-      });
-
+      // Trial site markers (blue default MQ marker)
       for (const loc of trial.locations ?? []) {
         if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
-        L.marker([loc.lat, loc.lon], { icon: blueIcon })
+        L.marker([loc.lat, loc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#1a56db", secondaryColor: "#bfdbfe", size: "sm" }) })
           .addTo(map)
           .bindPopup(`
-            <div style="max-width:180px">
-              <strong style="color:#2563eb;font-size:12px">🏥 Trial Site</strong><br/>
+            <div style="max-width:180px;font-family:sans-serif">
+              <strong style="font-size:11px;color:#1a56db">🏥 Trial Site</strong><br/>
               <span style="font-size:11px">${loc.facility ?? ""}</span><br/>
-              <span style="font-size:11px;color:#6b7280">${loc.city}, ${loc.state}</span>
+              <span style="font-size:10px;color:#6b7280">${[loc.city, loc.state].filter(Boolean).join(", ")}</span>
             </div>
           `);
       }
 
       // Physician markers (green)
-      const greenIcon = L.icon({
-        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-      });
-
       for (const doc of physicians) {
         if (!doc.lat || !doc.lon) continue;
-        L.marker([doc.lat, doc.lon], { icon: greenIcon })
+        L.marker([doc.lat, doc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#16a34a", secondaryColor: "#bbf7d0", size: "sm" }) })
           .addTo(map)
           .bindPopup(`
-            <div style="max-width:180px">
-              <strong style="color:#16a34a;font-size:12px">👨‍⚕️ ${doc.name}</strong><br/>
+            <div style="max-width:180px;font-family:sans-serif">
+              <strong style="font-size:11px;color:#16a34a">👨‍⚕️ ${doc.name}</strong><br/>
               <span style="font-size:11px">${doc.specialty ?? ""}</span><br/>
-              <span style="font-size:11px;color:#6b7280">${doc.address ?? ""}, ${doc.city}, ${doc.state}</span>
+              ${doc.taxonomyCode ? `<span style="font-size:10px;color:#6b7280;font-family:monospace">${doc.taxonomyCode}</span><br/>` : ""}
+              <span style="font-size:10px;color:#6b7280">${[doc.city, doc.state].filter(Boolean).join(", ")}</span>
             </div>
           `);
       }
 
       // Radius circle
-      if (firstLoc?.lat && firstLoc?.lon) {
-        circleRef.current = L.circle([firstLoc.lat, firstLoc.lon], {
-          radius: radius * 1000,
-          color: "#2563eb",
-          fillColor: "#93c5fd",
-          fillOpacity: 0.15,
-          weight: 2,
-        }).addTo(map);
-      }
-    })();
+      circleRef.current = L.circle(center, {
+        radius: radius * 1000,
+        color: "#1a56db",
+        fillColor: "#bfdbfe",
+        fillOpacity: 0.12,
+        weight: 2,
+      }).addTo(map);
+    };
 
+    init();
     return () => {
+      cancelled = true;
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
         circleRef.current = null;
       }
     };
-  }, []);
+  }, [trial, physicians]);
 
   useEffect(() => {
     if (!circleRef.current) return;
@@ -118,37 +132,26 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
   }, [radius]);
 
   return (
-    <div className="mt-4 border rounded-lg overflow-hidden shadow">
-      <div className="bg-gray-50 px-4 py-3 border-b flex flex-wrap items-center gap-4">
-        <span className="text-sm font-semibold text-gray-700">🗺️ Map View</span>
-
-        <div className="flex items-center gap-3 text-xs text-gray-600">
-          <span className="flex items-center gap-1">
-            <span style={{ background: "#2563eb" }} className="inline-block w-4 h-4 rounded-full text-white text-center leading-4 font-bold text-xs">T</span>
-            Trial Sites
+    <div style={{ border: "1px solid #e8eaed", borderRadius: "10px", overflow: "hidden" }}>
+      <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>🗺️ Map View</span>
+        <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: "#6b7280" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#1a56db", display: "inline-block" }} /> Trial Sites
           </span>
-          <span className="flex items-center gap-1">
-            <span style={{ background: "#16a34a" }} className="inline-block w-4 h-4 rounded-full text-white text-center leading-4 font-bold text-xs">P</span>
-            Physicians
+          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} /> Physicians
           </span>
         </div>
-
-        <div className="flex items-center gap-2 ml-auto">
-          <label className="text-xs text-gray-600 font-medium whitespace-nowrap">
-            Radius: <span className="font-bold text-blue-600">{radius} km</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+          <label style={{ fontSize: "12px", color: "#6b7280", fontWeight: 500, whiteSpace: "nowrap" }}>
+            Radius: <strong style={{ color: "#1a56db" }}>{radius} km</strong>
           </label>
-          <input
-            type="range"
-            min={10}
-            max={300}
-            step={10}
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            className="w-32 accent-blue-600"
-          />
+          <input type="range" min={10} max={300} step={10} value={radius}
+            onChange={e => setRadius(Number(e.target.value))}
+            style={{ width: "120px", accentColor: "#1a56db" }} />
         </div>
       </div>
-
       <div ref={mapRef} style={{ height: "400px", width: "100%" }} />
     </div>
   );

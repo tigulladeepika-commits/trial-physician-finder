@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Trial, Physician } from "../types";
 import { fetchPhysicians } from "../utils/api";
 import PhysicianCard from "./PhysicianCard";
@@ -17,12 +17,12 @@ const NON_US = [
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; dot: string }> = {
-  RECRUITING: { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e" },
-  COMPLETED: { bg: "#f8fafc", color: "#64748b", dot: "#94a3b8" },
-  TERMINATED: { bg: "#fff7ed", color: "#c2410c", dot: "#f97316" },
-  UNKNOWN: { bg: "#fafafa", color: "#6b7280", dot: "#d1d5db" },
-  "NOT YET RECRUITING": { bg: "#eff6ff", color: "#1d4ed8", dot: "#60a5fa" },
-  "ACTIVE, NOT RECRUITING": { bg: "#faf5ff", color: "#7c3aed", dot: "#a78bfa" },
+  RECRUITING:              { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e" },
+  COMPLETED:               { bg: "#f8fafc", color: "#64748b", dot: "#94a3b8" },
+  TERMINATED:              { bg: "#fff7ed", color: "#c2410c", dot: "#f97316" },
+  UNKNOWN:                 { bg: "#fafafa", color: "#6b7280", dot: "#d1d5db" },
+  "NOT YET RECRUITING":    { bg: "#eff6ff", color: "#1d4ed8", dot: "#60a5fa" },
+  "ACTIVE, NOT RECRUITING":{ bg: "#faf5ff", color: "#7c3aed", dot: "#a78bfa" },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -48,14 +48,33 @@ export default function TrialCard({ trial }: TrialCardProps) {
   const [showMap, setShowMap] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showCriteria, setShowCriteria] = useState(false);
+  const [taxonomyFilter, setTaxonomyFilter] = useState<string>("all");
 
   const usLocations = (trial.locations ?? []).filter(l => l.country === "United States");
+
+  // Build unique taxonomy options from fetched physicians
+  const taxonomyOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const doc of physicians) {
+      if (doc.taxonomyCode && doc.taxonomyDescription) {
+        map.set(doc.taxonomyCode, doc.taxonomyDescription);
+      }
+    }
+    return Array.from(map.entries()).map(([code, desc]) => ({ code, desc }));
+  }, [physicians]);
+
+  // Apply taxonomy filter
+  const filteredPhysicians = useMemo(() => {
+    if (taxonomyFilter === "all") return physicians;
+    return physicians.filter(d => d.taxonomyCode === taxonomyFilter);
+  }, [physicians, taxonomyFilter]);
 
   const handleFetchPhysicians = async () => {
     if (fetched) {
       setFetched(false);
       setPhysicians([]);
       setShowMap(false);
+      setTaxonomyFilter("all");
       return;
     }
 
@@ -68,7 +87,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
 
       for (const loc of trial.locations ?? []) {
         const country = loc.country ?? "";
-        const isNonUS = NON_US.some((c) => country.includes(c));
+        const isNonUS = NON_US.some(c => country.includes(c));
         if (isNonUS) continue;
         const city = loc.city ?? "";
         const state = loc.state ?? "";
@@ -112,29 +131,25 @@ export default function TrialCard({ trial }: TrialCardProps) {
   };
 
   return (
-    <div style={{
-      background: "white",
-      borderRadius: "12px",
-      border: "1px solid #e8eaed",
-      marginBottom: "12px",
-      overflow: "hidden",
-      transition: "box-shadow 0.2s",
-      fontFamily: "'DM Sans', sans-serif",
-    }}
-      onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")}
-      onMouseLeave={e => (e.currentTarget.style.boxShadow = "none")}
+    <div
+      style={{
+        background: "white", borderRadius: "12px", border: "1px solid #e8eaed",
+        marginBottom: "12px", overflow: "hidden", transition: "box-shadow 0.2s",
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display&display=swap');
-        .trial-card-btn { transition: all 0.15s; cursor: pointer; }
-        .trial-card-btn:hover { opacity: 0.85; }
-        .expand-btn { background: none; border: none; cursor: pointer; padding: 4px; color: #9ca3af; transition: color 0.15s; }
-        .expand-btn:hover { color: #374151; }
-        .section-toggle { background: none; border: none; cursor: pointer; font-size: 12px; color: #6b7280; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 4px; padding: 0; transition: color 0.15s; }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+        .tc-btn { transition: all 0.15s; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+        .tc-btn:hover { opacity: 0.85; }
+        .section-toggle { background: none; border: none; cursor: pointer; font-size: 12px; color: #6b7280; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 4px; padding: 0; }
         .section-toggle:hover { color: #1a56db; }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
-      {/* Card Header */}
+      {/* Card Header — clickable to expand */}
       <div style={{ padding: "20px 24px 16px", cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -151,7 +166,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
               {trial.title}
             </h2>
           </div>
-          <button className="expand-btn">
+          <button style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#9ca3af" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
               style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
               <polyline points="6 9 12 15 18 9"/>
@@ -190,7 +205,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
         <div style={{ borderTop: "1px solid #f3f4f6" }}>
           <div style={{ padding: "20px 24px" }}>
 
-            {/* Meta row */}
+            {/* Meta */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "24px", marginBottom: "16px" }}>
               {trial.conditions && trial.conditions.length > 0 && (
                 <div>
@@ -206,7 +221,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
               )}
             </div>
 
-            {/* Description */}
             {trial.description && (
               <p style={{ fontSize: "13px", color: "#6b7280", lineHeight: 1.6, marginBottom: "16px" }}>
                 {trial.description}
@@ -214,10 +228,10 @@ export default function TrialCard({ trial }: TrialCardProps) {
             )}
 
             {/* Locations */}
-            {trial.locations && trial.locations.length > 0 && (
+            {usLocations.length > 0 && (
               <div style={{ marginBottom: "16px" }}>
                 <div style={{ fontSize: "11px", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>
-                  Locations ({usLocations.length} US)
+                  US Locations ({usLocations.length})
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                   {usLocations.slice(0, 6).map((loc, i) => (
@@ -234,7 +248,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
               </div>
             )}
 
-            {/* Eligibility Criteria - collapsible */}
+            {/* Eligibility criteria — collapsible */}
             {(trial.inclusionCriteria || trial.exclusionCriteria) && (
               <div style={{ marginBottom: "16px" }}>
                 <button className="section-toggle" onClick={() => setShowCriteria(!showCriteria)}>
@@ -248,13 +262,13 @@ export default function TrialCard({ trial }: TrialCardProps) {
                   <div style={{ marginTop: "12px", display: "grid", gap: "12px", gridTemplateColumns: "1fr 1fr" }}>
                     {trial.inclusionCriteria && (
                       <div style={{ background: "#f0fdf4", borderRadius: "8px", padding: "12px 14px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: 600, color: "#15803d", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.3px" }}>Inclusion</div>
+                        <div style={{ fontSize: "11px", fontWeight: 600, color: "#15803d", marginBottom: "6px", textTransform: "uppercase" }}>Inclusion</div>
                         <p style={{ fontSize: "12px", color: "#374151", lineHeight: 1.5, whiteSpace: "pre-line" }}>{trial.inclusionCriteria}</p>
                       </div>
                     )}
                     {trial.exclusionCriteria && (
                       <div style={{ background: "#fff7ed", borderRadius: "8px", padding: "12px 14px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: 600, color: "#c2410c", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.3px" }}>Exclusion</div>
+                        <div style={{ fontSize: "11px", fontWeight: 600, color: "#c2410c", marginBottom: "6px", textTransform: "uppercase" }}>Exclusion</div>
                         <p style={{ fontSize: "12px", color: "#374151", lineHeight: 1.5, whiteSpace: "pre-line" }}>{trial.exclusionCriteria}</p>
                       </div>
                     )}
@@ -292,21 +306,14 @@ export default function TrialCard({ trial }: TrialCardProps) {
             <button
               onClick={handleFetchPhysicians}
               disabled={loading}
+              className="tc-btn"
               style={{
                 background: fetched ? "#f8fafc" : "#1a56db",
                 color: fetched ? "#374151" : "white",
                 border: fetched ? "1.5px solid #e2e8f0" : "none",
-                padding: "9px 18px",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: 600,
-                fontFamily: "'DM Sans', sans-serif",
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.6 : 1,
-                transition: "all 0.15s",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
+                padding: "9px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
+                display: "flex", alignItems: "center", gap: "6px",
               }}
             >
               {loading ? (
@@ -316,12 +323,11 @@ export default function TrialCard({ trial }: TrialCardProps) {
                   </svg>
                   Finding physicians...
                 </>
-              ) : fetched ? (
-                "Hide Physicians"
-              ) : (
+              ) : fetched ? "Hide Physicians" : (
                 <>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                   </svg>
                   Find Physicians
                 </>
@@ -331,20 +337,13 @@ export default function TrialCard({ trial }: TrialCardProps) {
             {fetched && !loading && (
               <button
                 onClick={() => setShowMap(!showMap)}
+                className="tc-btn"
                 style={{
                   background: showMap ? "#eff6ff" : "white",
                   color: showMap ? "#1d4ed8" : "#374151",
                   border: `1.5px solid ${showMap ? "#bfdbfe" : "#e2e8f0"}`,
-                  padding: "9px 18px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  fontFamily: "'DM Sans', sans-serif",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
+                  padding: "9px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: "6px",
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -369,22 +368,57 @@ export default function TrialCard({ trial }: TrialCardProps) {
             </div>
           )}
 
-          {/* Physicians list */}
+          {/* Physicians list with taxonomy filter */}
           {fetched && !loading && (
             <div style={{ padding: "0 24px 20px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#374151", marginBottom: "12px" }}>
-                Physicians near trial locations
-                {trial.conditions?.[0] && (
-                  <span style={{ fontWeight: 400, color: "#9ca3af" }}> · {trial.conditions[0]}</span>
+
+              {/* Header + taxonomy filter */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", flexWrap: "wrap", gap: "10px" }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>
+                  Physicians near trial locations
+                  {trial.conditions?.[0] && (
+                    <span style={{ fontWeight: 400, color: "#9ca3af" }}> · {trial.conditions[0]}</span>
+                  )}
+                  <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: "6px" }}>
+                    ({filteredPhysicians.length}{taxonomyFilter !== "all" ? ` of ${physicians.length}` : ""})
+                  </span>
+                </div>
+
+                {/* Taxonomy filter dropdown */}
+                {taxonomyOptions.length > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <label style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap" }}>
+                      Filter by specialty
+                    </label>
+                    <select
+                      value={taxonomyFilter}
+                      onChange={e => setTaxonomyFilter(e.target.value)}
+                      style={{
+                        border: "1.5px solid #e5e7eb", borderRadius: "7px",
+                        padding: "6px 10px", fontSize: "12px",
+                        fontFamily: "'DM Sans', sans-serif", color: "#374151",
+                        background: "white", outline: "none", cursor: "pointer",
+                        minWidth: "220px",
+                      }}
+                    >
+                      <option value="all">All specialties</option>
+                      {taxonomyOptions.map(({ code, desc }) => (
+                        <option key={code} value={code}>
+                          {code} · {desc}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
-              {physicians.length === 0 ? (
+
+              {filteredPhysicians.length === 0 ? (
                 <div style={{ fontSize: "13px", color: "#9ca3af", padding: "16px", background: "#f9fafb", borderRadius: "8px", textAlign: "center" }}>
-                  No physicians found for this trial's locations.
+                  {taxonomyFilter !== "all" ? "No physicians match this specialty filter." : "No physicians found for this trial's locations."}
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px" }}>
-                  {physicians.map((doctor) => (
+                  {filteredPhysicians.map(doctor => (
                     <PhysicianCard key={doctor.npi} doctor={doctor} />
                   ))}
                 </div>
@@ -393,8 +427,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
           )}
         </div>
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trial } from "../types";
 
 type Props = {
@@ -9,81 +9,94 @@ type Props = {
   searchedState?: string;
 };
 
+const MQ_KEY = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
+
 declare global {
-  interface Window { L: any; }
+  interface Window { L: any; MQ: any; }
+}
+
+function loadMapQuest(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.MQ && window.L) { resolve(); return; }
+
+    const existing = document.querySelector('script[src*="mapquest"]');
+    if (!existing) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.css";
+      document.head.appendChild(link);
+
+      const script = document.createElement("script");
+      script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
+      document.head.appendChild(script);
+    }
+
+    const interval = setInterval(() => {
+      if (window.MQ && window.L) {
+        clearInterval(interval);
+        window.MQ.key = MQ_KEY;
+        resolve();
+      }
+    }, 50);
+  });
 }
 
 export default function TrialMap({ trials, searchedCity, searchedState }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
-
+  const circleRef = useRef<any>(null);
+  const [radius, setRadius] = useState(100);
   const hasLocationFilter = !!(searchedCity || searchedState);
 
   useEffect(() => {
-    // Cleanup previous map instance when location changes
-    if (mapInstance.current) {
-      mapInstance.current.remove();
-      mapInstance.current = null;
-    }
+    let cancelled = false;
 
-    if (!mapRef.current) return;
+    const init = async () => {
+      await loadMapQuest();
+      if (cancelled || !mapRef.current) return;
 
-    (async () => {
-      const L = (await import("leaflet")).default;
-      await import("leaflet/dist/leaflet.css");
-
+      // Cleanup previous instance
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+        circleRef.current = null;
+      }
       const container = mapRef.current;
-      if (!container) return;
       if ((container as any)._leaflet_id) {
         (container as any)._leaflet_id = undefined;
       }
 
-      const map = L.map(container).setView([39.5, -98.35], hasLocationFilter ? 7 : 4);
+      const L = window.L;
+      window.MQ.key = MQ_KEY;
+
+      const map = L.mapquest.map(container, {
+        center: [39.5, -98.35],
+        layers: L.mapquest.tileLayer("map"),
+        zoom: hasLocationFilter ? 8 : 4,
+      });
       mapInstance.current = map;
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(map);
-
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      });
-
+      // Collect matching points
       const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
-
       for (const trial of trials) {
         for (const loc of trial.locations ?? []) {
           if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
-
-          // If location searched, only show markers in that city/state
           if (hasLocationFilter) {
             const cityMatch = searchedCity
-              ? (loc.city ?? "").toLowerCase().includes(searchedCity.toLowerCase())
-              : true;
+              ? (loc.city ?? "").toLowerCase().includes(searchedCity.toLowerCase()) : true;
             const stateMatch = searchedState
-              ? (loc.state ?? "").toLowerCase().includes(searchedState.toLowerCase())
-              : true;
-            // Must match city OR state (not both required)
-            if (searchedCity && searchedState) {
-              if (!cityMatch && !stateMatch) continue;
-            } else if (searchedCity && !cityMatch) continue;
-            else if (searchedState && !stateMatch) continue;
+              ? (loc.state ?? "").toLowerCase().includes(searchedState.toLowerCase()) : true;
+            if (searchedCity && searchedState && !cityMatch && !stateMatch) continue;
+            else if (searchedCity && !searchedState && !cityMatch) continue;
+            else if (searchedState && !searchedCity && !stateMatch) continue;
           }
-
-          points.push({
-            lat: loc.lat,
-            lon: loc.lon,
-            title: trial.title ?? trial.nctId ?? "",
-            nctId: trial.nctId ?? "",
-          });
+          points.push({ lat: loc.lat, lon: loc.lon, title: trial.title ?? "", nctId: trial.nctId ?? "" });
         }
       }
 
+      // Add markers
       for (const p of points) {
-        L.marker([p.lat, p.lon])
+        L.marker([p.lat, p.lon], { icon: L.mapquest.icons.marker() })
           .addTo(map)
           .bindPopup(`
             <div style="max-width:200px;font-family:sans-serif">
@@ -93,42 +106,66 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
           `);
       }
 
+      // Radius circle around center of searched location
+      if (hasLocationFilter && points.length > 0) {
+        const centerLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
+        const centerLon = points.reduce((s, p) => s + p.lon, 0) / points.length;
+        circleRef.current = L.circle([centerLat, centerLon], {
+          radius: radius * 1000,
+          color: "#1a56db",
+          fillColor: "#bfdbfe",
+          fillOpacity: 0.15,
+          weight: 2,
+        }).addTo(map);
+      }
+
+      // Fit bounds
       if (points.length > 0) {
-        const lats = points.map((p) => p.lat);
-        const lons = points.map((p) => p.lon);
-        // Tighter zoom when location is filtered
+        const lats = points.map(p => p.lat);
+        const lons = points.map(p => p.lon);
         const pad = hasLocationFilter ? 0.3 : 1;
         map.fitBounds([
           [Math.min(...lats) - pad, Math.min(...lons) - pad],
           [Math.max(...lats) + pad, Math.max(...lons) + pad],
         ]);
       }
-    })();
+    };
 
+    init();
     return () => {
+      cancelled = true;
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
+        circleRef.current = null;
       }
     };
   }, [trials, searchedCity, searchedState]);
 
+  // Update radius circle without re-initializing map
+  useEffect(() => {
+    if (!circleRef.current) return;
+    circleRef.current.setRadius(radius * 1000);
+  }, [radius]);
+
   const locationLabel = [searchedCity, searchedState].filter(Boolean).join(", ");
 
   return (
-    <div className="mb-6 border rounded-lg overflow-hidden shadow">
-      <div className="bg-gray-100 px-4 py-2 border-b flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-semibold text-gray-700">📍 Trial Locations Map</span>
-        <span className="text-xs text-gray-400">
-          {hasLocationFilter
-            ? `Showing trial sites in ${locationLabel}`
-            : `Showing all US locations for ${trials.length} trial${trials.length !== 1 ? "s" : ""}`
-          }
+    <div style={{ marginBottom: "24px", border: "1px solid #e8eaed", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+      <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>📍 Trial Locations</span>
+        <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+          {hasLocationFilter ? `Filtered to ${locationLabel}` : `All US locations · ${trials.length} trial${trials.length !== 1 ? "s" : ""}`}
         </span>
         {hasLocationFilter && (
-          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 ml-auto">
-            Filtered to {locationLabel}
-          </span>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+            <label style={{ fontSize: "12px", color: "#6b7280", fontWeight: 500, whiteSpace: "nowrap" }}>
+              Radius: <strong style={{ color: "#1a56db" }}>{radius} km</strong>
+            </label>
+            <input type="range" min={10} max={500} step={10} value={radius}
+              onChange={e => setRadius(Number(e.target.value))}
+              style={{ width: "120px", accentColor: "#1a56db" }} />
+          </div>
         )}
       </div>
       <div ref={mapRef} style={{ height: "350px", width: "100%" }} />
