@@ -12,8 +12,7 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const circleRef = useRef<any>(null);
-  const [radius, setRadius] = useState(50); // km
-  const [loaded, setLoaded] = useState(false);
+  const [radius, setRadius] = useState(50);
 
   const mapId = `trial-physician-map-${trial.nctId}`;
 
@@ -32,16 +31,29 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
 
         const script = document.createElement("script");
         script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
-        script.onload = () => resolve();
+        script.onload = () => {
+          const interval = setInterval(() => {
+            if (window.MQ && window.L) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 50);
+        };
+        script.onerror = () => console.error("Failed to load MapQuest script");
         document.head.appendChild(script);
       });
 
     loadMapQuest().then(() => {
       if (mapInstance.current) return;
 
+      const container = document.getElementById(mapId);
+      if (!container) return;
+      if ((container as any)._leaflet_id) {
+        (container as any)._leaflet_id = undefined;
+      }
+
       window.MQ.key = key;
 
-      // Find center: first US trial location with coords
       const firstLoc = trial.locations?.find(
         (l) => l.lat && l.lon && l.country === "United States"
       );
@@ -92,18 +104,16 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         `);
       }
 
-      // Draw radius circle around first trial location
+      // Radius circle
       if (firstLoc?.lat && firstLoc?.lon) {
         circleRef.current = window.L.circle([firstLoc.lat, firstLoc.lon], {
-          radius: radius * 1000, // meters
+          radius: radius * 1000,
           color: "#2563eb",
           fillColor: "#93c5fd",
           fillOpacity: 0.15,
           weight: 2,
         }).addTo(map);
       }
-
-      setLoaded(true);
     });
 
     return () => {
@@ -111,12 +121,10 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         mapInstance.current.remove();
         mapInstance.current = null;
         circleRef.current = null;
-        setLoaded(false);
       }
     };
   }, []);
 
-  // Update circle radius when slider changes
   useEffect(() => {
     if (!circleRef.current) return;
     circleRef.current.setRadius(radius * 1000);
@@ -127,7 +135,6 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
       <div className="bg-gray-50 px-4 py-3 border-b flex flex-wrap items-center gap-4">
         <span className="text-sm font-semibold text-gray-700">🗺️ Map View</span>
 
-        {/* Legend */}
         <div className="flex items-center gap-3 text-xs text-gray-600">
           <span className="flex items-center gap-1">
             <span style={{ background: "#2563eb" }} className="inline-block w-4 h-4 rounded-full text-white text-center leading-4 font-bold text-xs">T</span>
@@ -139,7 +146,6 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
           </span>
         </div>
 
-        {/* Radius slider */}
         <div className="flex items-center gap-2 ml-auto">
           <label className="text-xs text-gray-600 font-medium whitespace-nowrap">
             Radius: <span className="font-bold text-blue-600">{radius} km</span>

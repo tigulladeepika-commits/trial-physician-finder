@@ -23,9 +23,8 @@ export default function TrialMap({ trials }: Props) {
 
     const key = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
 
-    // Load MapQuest scripts dynamically
-    const loadMapQuest = () => {
-      return new Promise<void>((resolve) => {
+    const loadMapQuest = () =>
+      new Promise<void>((resolve) => {
         if (window.L && window.MQ) { resolve(); return; }
 
         const link = document.createElement("link");
@@ -34,13 +33,26 @@ export default function TrialMap({ trials }: Props) {
         document.head.appendChild(link);
 
         const script = document.createElement("script");
-        script.src = `https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js`;
-        script.onload = () => resolve();
+        script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
+        script.onload = () => {
+          const interval = setInterval(() => {
+            if (window.MQ && window.L) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 50);
+        };
+        script.onerror = () => console.error("Failed to load MapQuest script");
         document.head.appendChild(script);
       });
-    };
 
     loadMapQuest().then(() => {
+      const container = document.getElementById("trial-overview-map");
+      if (!container) return;
+      if ((container as any)._leaflet_id) {
+        (container as any)._leaflet_id = undefined;
+      }
+
       window.MQ.key = key;
 
       const map = window.MQ.map("trial-overview-map", {
@@ -50,7 +62,6 @@ export default function TrialMap({ trials }: Props) {
 
       mapInstance.current = map;
 
-      // Collect all US trial locations
       const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
 
       for (const trial of trials) {
@@ -66,7 +77,6 @@ export default function TrialMap({ trials }: Props) {
         }
       }
 
-      // Add markers
       for (const p of points) {
         const marker = window.MQ.marker([p.lat, p.lon]).addTo(map);
         marker.bindPopup(`
@@ -77,7 +87,6 @@ export default function TrialMap({ trials }: Props) {
         `);
       }
 
-      // Fit bounds if we have points
       if (points.length > 0) {
         const lats = points.map((p) => p.lat);
         const lons = points.map((p) => p.lon);
