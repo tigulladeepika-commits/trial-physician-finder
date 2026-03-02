@@ -21,8 +21,7 @@ export default function TrialMap({ trials }: Props) {
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
-    const key = process.env.NEXT_PUBLIC_MAPQUEST_KEY;
-    if (!key) return;
+    const key = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
 
     // Load MapQuest scripts dynamically
     const loadMapQuest = () => {

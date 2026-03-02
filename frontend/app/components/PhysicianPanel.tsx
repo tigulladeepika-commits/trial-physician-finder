@@ -31,18 +31,17 @@ export default function PhysicianPanel({ trial }: PhysicianPanelProps) {
 
   const firstLocation = trial.contactsLocationsModule?.locations?.[0];
   const trialLat = firstLocation?.geoPoint?.lat ?? 0;
-  const trialLng = firstLocation?.geoPoint?.lon ?? 0;
+  const trialLon = firstLocation?.geoPoint?.lon ?? 0;
   const trialLocations = trial.contactsLocationsModule?.locations?.map((loc) => ({
-  lat: loc.geoPoint?.lat ?? 0,
-  lng: loc.geoPoint?.lon ?? 0,
+    lat: loc.geoPoint?.lat ?? 0,
+    lon: loc.geoPoint?.lon ?? 0,  // lng → lon
   })) ?? [];
-
 
   return (
     <div className="mt-4">
       <PhysicianFilters filters={filters} setFilters={setFilters} specialties={specialties} />
       <MapView
-        center={[trialLat, trialLng]}
+        center={[trialLat, trialLon]}
         trialLocations={trialLocations}
         physicians={physicians}
         radius={filters.radius}
