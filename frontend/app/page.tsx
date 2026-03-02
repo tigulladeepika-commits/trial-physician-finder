@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useTrials } from "./hooks/useTrials";
 import TrialCard from "./components/TrialCard";
-import TrialMap from "./components/TrialMap";
 import { Trial } from "./types";
+import dynamic from "next/dynamic";
+const TrialMap = dynamic(() => import("./components/TrialMap"), { ssr: false });
 
 export default function Page() {
   const [condition, setCondition] = useState("");

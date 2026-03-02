@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { Trial, Physician } from "../types";
 import { fetchPhysicians } from "../utils/api";
 import PhysicianCard from "./PhysicianCard";
-import PhysicianTrialMap from "./PhysicianTrialMap";
+import dynamic from "next/dynamic";
+const PhysicianTrialMap = dynamic(() => import("./PhysicianTrialMap"), { ssr: false });
 
 type TrialCardProps = {
   trial: Trial;

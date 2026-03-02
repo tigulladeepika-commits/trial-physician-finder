@@ -46,16 +46,22 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
   const mapInstance = useRef<any>(null);
   const circleRef = useRef<any>(null);
   const [radius, setRadius] = useState(100);
+  const [isClient, setIsClient] = useState(false);
   const hasLocationFilter = !!(searchedCity || searchedState);
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
     let cancelled = false;
 
     const init = async () => {
       await loadMapQuest();
       if (cancelled || !mapRef.current) return;
 
-      // Cleanup previous instance
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
@@ -76,7 +82,6 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
       });
       mapInstance.current = map;
 
-      // Collect matching points
       const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
       for (const trial of trials) {
         for (const loc of trial.locations ?? []) {
@@ -94,7 +99,6 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         }
       }
 
-      // Add markers
       for (const p of points) {
         L.marker([p.lat, p.lon], { icon: L.mapquest.icons.marker() })
           .addTo(map)
@@ -106,7 +110,6 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
           `);
       }
 
-      // Radius circle around center of searched location
       if (hasLocationFilter && points.length > 0) {
         const centerLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
         const centerLon = points.reduce((s, p) => s + p.lon, 0) / points.length;
@@ -119,7 +122,6 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         }).addTo(map);
       }
 
-      // Fit bounds
       if (points.length > 0) {
         const lats = points.map(p => p.lat);
         const lons = points.map(p => p.lon);
@@ -140,15 +142,25 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         circleRef.current = null;
       }
     };
-  }, [trials, searchedCity, searchedState]);
+  }, [trials, searchedCity, searchedState, isClient]);
 
-  // Update radius circle without re-initializing map
   useEffect(() => {
     if (!circleRef.current) return;
     circleRef.current.setRadius(radius * 1000);
   }, [radius]);
 
   const locationLabel = [searchedCity, searchedState].filter(Boolean).join(", ");
+
+  if (!isClient) {
+    return (
+      <div style={{ marginBottom: "24px", border: "1px solid #e8eaed", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+        <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "12px" }}>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>📍 Trial Locations</span>
+        </div>
+        <div style={{ height: "350px", background: "#f1f5f9" }} className="animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div style={{ marginBottom: "24px", border: "1px solid #e8eaed", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
