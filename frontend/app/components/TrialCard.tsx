@@ -141,15 +141,6 @@ export default function TrialCard({ trial }: TrialCardProps) {
       onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)"}
       onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
-        .tc-btn { transition: all 0.15s; cursor: pointer; font-family: 'DM Sans', sans-serif; }
-        .tc-btn:hover { opacity: 0.85; }
-        .section-toggle { background: none; border: none; cursor: pointer; font-size: 12px; color: #6b7280; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 4px; padding: 0; }
-        .section-toggle:hover { color: #1a56db; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-
       {/* Card Header — clickable to expand */}
       <div style={{ padding: "20px 24px 16px", cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
