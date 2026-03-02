@@ -59,69 +59,73 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
 
     let cancelled = false;
 
-    const init = async () => {
-      await loadMapQuest();
-      if (cancelled || !mapRef.current) return;
+    const timer = setTimeout(() => {
+      const init = async () => {
+        await loadMapQuest();
+        if (cancelled || !mapRef.current) return;
 
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-        circleRef.current = null;
-      }
-      const container = mapRef.current;
-      if ((container as any)._leaflet_id) {
-        (container as any)._leaflet_id = undefined;
-      }
+        if (mapInstance.current) {
+          mapInstance.current.remove();
+          mapInstance.current = null;
+          circleRef.current = null;
+        }
+        const container = mapRef.current;
+        if ((container as any)._leaflet_id) {
+          (container as any)._leaflet_id = undefined;
+        }
 
-      const L = window.L;
-      window.MQ.key = MQ_KEY;
+        const L = window.L;
+        window.MQ.key = MQ_KEY;
 
-      const map = L.mapquest.map(container, {
-        center,
-        layers: L.mapquest.tileLayer("map"),
-        zoom: 8,
-      });
-      mapInstance.current = map;
+        const map = L.mapquest.map(container, {
+          center,
+          layers: L.mapquest.tileLayer("map"),
+          zoom: 8,
+        });
+        mapInstance.current = map;
 
-      for (const loc of trial.locations ?? []) {
-        if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
-        L.marker([loc.lat, loc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#1a56db", secondaryColor: "#bfdbfe", size: "sm" }) })
-          .addTo(map)
-          .bindPopup(`
-            <div style="max-width:180px;font-family:sans-serif">
-              <strong style="font-size:11px;color:#1a56db">🏥 Trial Site</strong><br/>
-              <span style="font-size:11px">${loc.facility ?? ""}</span><br/>
-              <span style="font-size:10px;color:#6b7280">${[loc.city, loc.state].filter(Boolean).join(", ")}</span>
-            </div>
-          `);
-      }
+        for (const loc of trial.locations ?? []) {
+          if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
+          L.marker([loc.lat, loc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#1a56db", secondaryColor: "#bfdbfe", size: "sm" }) })
+            .addTo(map)
+            .bindPopup(`
+              <div style="max-width:180px;font-family:sans-serif">
+                <strong style="font-size:11px;color:#1a56db">🏥 Trial Site</strong><br/>
+                <span style="font-size:11px">${loc.facility ?? ""}</span><br/>
+                <span style="font-size:10px;color:#6b7280">${[loc.city, loc.state].filter(Boolean).join(", ")}</span>
+              </div>
+            `);
+        }
 
-      for (const doc of physicians) {
-        if (!doc.lat || !doc.lon) continue;
-        L.marker([doc.lat, doc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#16a34a", secondaryColor: "#bbf7d0", size: "sm" }) })
-          .addTo(map)
-          .bindPopup(`
-            <div style="max-width:180px;font-family:sans-serif">
-              <strong style="font-size:11px;color:#16a34a">👨‍⚕️ ${doc.name}</strong><br/>
-              <span style="font-size:11px">${doc.specialty ?? ""}</span><br/>
-              ${doc.taxonomyCode ? `<span style="font-size:10px;color:#6b7280;font-family:monospace">${doc.taxonomyCode}</span><br/>` : ""}
-              <span style="font-size:10px;color:#6b7280">${[doc.city, doc.state].filter(Boolean).join(", ")}</span>
-            </div>
-          `);
-      }
+        for (const doc of physicians) {
+          if (!doc.lat || !doc.lon) continue;
+          L.marker([doc.lat, doc.lon], { icon: L.mapquest.icons.marker({ primaryColor: "#16a34a", secondaryColor: "#bbf7d0", size: "sm" }) })
+            .addTo(map)
+            .bindPopup(`
+              <div style="max-width:180px;font-family:sans-serif">
+                <strong style="font-size:11px;color:#16a34a">👨‍⚕️ ${doc.name}</strong><br/>
+                <span style="font-size:11px">${doc.specialty ?? ""}</span><br/>
+                ${doc.taxonomyCode ? `<span style="font-size:10px;color:#6b7280;font-family:monospace">${doc.taxonomyCode}</span><br/>` : ""}
+                <span style="font-size:10px;color:#6b7280">${[doc.city, doc.state].filter(Boolean).join(", ")}</span>
+              </div>
+            `);
+        }
 
-      circleRef.current = L.circle(center, {
-        radius: radius * 1000,
-        color: "#1a56db",
-        fillColor: "#bfdbfe",
-        fillOpacity: 0.12,
-        weight: 2,
-      }).addTo(map);
-    };
+        circleRef.current = L.circle(center, {
+          radius: radius * 1000,
+          color: "#1a56db",
+          fillColor: "#bfdbfe",
+          fillOpacity: 0.12,
+          weight: 2,
+        }).addTo(map);
+      };
 
-    init();
+      init();
+    }, 100);
+
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
@@ -141,7 +145,7 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "16px" }}>
           <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>🗺️ Map View</span>
         </div>
-        <div style={{ height: "400px", background: "#f1f5f9" }} className="animate-pulse" />
+        <div style={{ height: "400px", background: "#f1f5f9" }} />
       </div>
     );
   }

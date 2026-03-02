@@ -58,84 +58,88 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
 
     let cancelled = false;
 
-    const init = async () => {
-      await loadMapQuest();
-      if (cancelled || !mapRef.current) return;
+    const timer = setTimeout(() => {
+      const init = async () => {
+        await loadMapQuest();
+        if (cancelled || !mapRef.current) return;
 
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-        circleRef.current = null;
-      }
-      const container = mapRef.current;
-      if ((container as any)._leaflet_id) {
-        (container as any)._leaflet_id = undefined;
-      }
-
-      const L = window.L;
-      window.MQ.key = MQ_KEY;
-
-      const map = L.mapquest.map(container, {
-        center: [39.5, -98.35],
-        layers: L.mapquest.tileLayer("map"),
-        zoom: hasLocationFilter ? 8 : 4,
-      });
-      mapInstance.current = map;
-
-      const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
-      for (const trial of trials) {
-        for (const loc of trial.locations ?? []) {
-          if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
-          if (hasLocationFilter) {
-            const cityMatch = searchedCity
-              ? (loc.city ?? "").toLowerCase().includes(searchedCity.toLowerCase()) : true;
-            const stateMatch = searchedState
-              ? (loc.state ?? "").toLowerCase().includes(searchedState.toLowerCase()) : true;
-            if (searchedCity && searchedState && !cityMatch && !stateMatch) continue;
-            else if (searchedCity && !searchedState && !cityMatch) continue;
-            else if (searchedState && !searchedCity && !stateMatch) continue;
-          }
-          points.push({ lat: loc.lat, lon: loc.lon, title: trial.title ?? "", nctId: trial.nctId ?? "" });
+        if (mapInstance.current) {
+          mapInstance.current.remove();
+          mapInstance.current = null;
+          circleRef.current = null;
         }
-      }
+        const container = mapRef.current;
+        if ((container as any)._leaflet_id) {
+          (container as any)._leaflet_id = undefined;
+        }
 
-      for (const p of points) {
-        L.marker([p.lat, p.lon], { icon: L.mapquest.icons.marker() })
-          .addTo(map)
-          .bindPopup(`
-            <div style="max-width:200px;font-family:sans-serif">
-              <strong style="font-size:12px;color:#1a56db">${p.nctId}</strong><br/>
-              <span style="font-size:11px;color:#555">${p.title.slice(0, 80)}${p.title.length > 80 ? "..." : ""}</span>
-            </div>
-          `);
-      }
+        const L = window.L;
+        window.MQ.key = MQ_KEY;
 
-      if (hasLocationFilter && points.length > 0) {
-        const centerLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
-        const centerLon = points.reduce((s, p) => s + p.lon, 0) / points.length;
-        circleRef.current = L.circle([centerLat, centerLon], {
-          radius: radius * 1000,
-          color: "#1a56db",
-          fillColor: "#bfdbfe",
-          fillOpacity: 0.15,
-          weight: 2,
-        }).addTo(map);
-      }
+        const map = L.mapquest.map(container, {
+          center: [39.5, -98.35],
+          layers: L.mapquest.tileLayer("map"),
+          zoom: hasLocationFilter ? 8 : 4,
+        });
+        mapInstance.current = map;
 
-      if (points.length > 0) {
-        const lats = points.map(p => p.lat);
-        const lons = points.map(p => p.lon);
-        const pad = hasLocationFilter ? 0.3 : 1;
-        map.fitBounds([
-          [Math.min(...lats) - pad, Math.min(...lons) - pad],
-          [Math.max(...lats) + pad, Math.max(...lons) + pad],
-        ]);
-      }
-    };
+        const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
+        for (const trial of trials) {
+          for (const loc of trial.locations ?? []) {
+            if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
+            if (hasLocationFilter) {
+              const cityMatch = searchedCity
+                ? (loc.city ?? "").toLowerCase().includes(searchedCity.toLowerCase()) : true;
+              const stateMatch = searchedState
+                ? (loc.state ?? "").toLowerCase().includes(searchedState.toLowerCase()) : true;
+              if (searchedCity && searchedState && !cityMatch && !stateMatch) continue;
+              else if (searchedCity && !searchedState && !cityMatch) continue;
+              else if (searchedState && !searchedCity && !stateMatch) continue;
+            }
+            points.push({ lat: loc.lat, lon: loc.lon, title: trial.title ?? "", nctId: trial.nctId ?? "" });
+          }
+        }
 
-    init();
+        for (const p of points) {
+          L.marker([p.lat, p.lon], { icon: L.mapquest.icons.marker() })
+            .addTo(map)
+            .bindPopup(`
+              <div style="max-width:200px;font-family:sans-serif">
+                <strong style="font-size:12px;color:#1a56db">${p.nctId}</strong><br/>
+                <span style="font-size:11px;color:#555">${p.title.slice(0, 80)}${p.title.length > 80 ? "..." : ""}</span>
+              </div>
+            `);
+        }
+
+        if (hasLocationFilter && points.length > 0) {
+          const centerLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
+          const centerLon = points.reduce((s, p) => s + p.lon, 0) / points.length;
+          circleRef.current = L.circle([centerLat, centerLon], {
+            radius: radius * 1000,
+            color: "#1a56db",
+            fillColor: "#bfdbfe",
+            fillOpacity: 0.15,
+            weight: 2,
+          }).addTo(map);
+        }
+
+        if (points.length > 0) {
+          const lats = points.map(p => p.lat);
+          const lons = points.map(p => p.lon);
+          const pad = hasLocationFilter ? 0.3 : 1;
+          map.fitBounds([
+            [Math.min(...lats) - pad, Math.min(...lons) - pad],
+            [Math.max(...lats) + pad, Math.max(...lons) + pad],
+          ]);
+        }
+      };
+
+      init();
+    }, 100);
+
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
@@ -157,7 +161,7 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "12px" }}>
           <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>📍 Trial Locations</span>
         </div>
-        <div style={{ height: "350px", background: "#f1f5f9" }} className="animate-pulse" />
+        <div style={{ height: "350px", background: "#f1f5f9" }} />
       </div>
     );
   }
