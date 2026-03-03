@@ -1,7 +1,7 @@
 import httpx
 import logging
 import asyncio
-from app.services.mapquest_api import geocode_address
+from app.services.geoapify_api import geocode_address
 
 logger = logging.getLogger(__name__)
 
