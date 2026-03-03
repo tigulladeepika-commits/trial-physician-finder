@@ -44,8 +44,11 @@ CONDITION_SYNONYMS = {
     "bladder cancer": "bladder cancer OR urothelial carcinoma OR bladder neoplasm",
     "thyroid cancer": "thyroid cancer OR thyroid carcinoma OR papillary thyroid OR follicular thyroid",
     "stomach cancer": "stomach cancer OR gastric cancer OR gastric carcinoma OR gastroesophageal",
-    "cardiology": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial OR heart disease",
-    "heart disease": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial",
+    # FIX: "cardiology" was too broad — generic terms like "cardiac" match unrelated
+    # trials (hemiplegia, hemodialysis, neonatal). Use specific named conditions instead
+    # so query.cond only matches trials where these ARE the primary condition.
+    "cardiology": "heart disease OR coronary artery disease OR heart failure OR hypertension OR atrial fibrillation OR cardiomyopathy OR arrhythmia OR myocardial infarction OR angina",
+    "heart disease": "heart disease OR coronary artery disease OR myocardial infarction OR angina OR cardiomyopathy OR ischemic heart disease",
     "heart failure": "heart failure OR cardiac failure OR congestive heart failure OR cardiomyopathy",
     "coronary artery disease": "coronary artery disease OR CAD OR angina OR atherosclerosis OR myocardial infarction",
     "hypertension": "hypertension OR high blood pressure OR arterial hypertension",
@@ -116,9 +119,11 @@ def _expand_condition(condition: str) -> str:
     return CONDITION_SYNONYMS.get(condition.lower().strip(), condition)
 
 
-def _expand_location(location: str) -> str | None:
+def _expand_location(location: str, us_only: bool = False) -> str | None:
+    # FIX: When no location is given but us_only=True, still restrict to US
+    # to avoid non-US trials flooding results.
     if not location or not location.strip():
-        return None
+        return "United States" if us_only else None
     parts = [p.strip() for p in location.split(",")]
     expanded = [STATE_MAP.get(p.upper(), p) for p in parts]
     result = ", ".join(expanded)
@@ -127,14 +132,56 @@ def _expand_location(location: str) -> str | None:
     return result
 
 
+# FIX: Map frontend phase values to exact ClinicalTrials API phase strings.
+# The API returns "PHASE1", "PHASE2" etc. but the frontend may send "Phase 1",
+# "phase1", "1" etc. Normalize all variants to the API's expected format.
+PHASE_NORMALIZE: dict[str, str] = {
+    "phase1": "PHASE1", "phase 1": "PHASE1", "1": "PHASE1", "phase i": "PHASE1",
+    "phase2": "PHASE2", "phase 2": "PHASE2", "2": "PHASE2", "phase ii": "PHASE2",
+    "phase3": "PHASE3", "phase 3": "PHASE3", "3": "PHASE3", "phase iii": "PHASE3",
+    "phase4": "PHASE4", "phase 4": "PHASE4", "4": "PHASE4", "phase iv": "PHASE4",
+    "early phase 1": "EARLY_PHASE1", "early_phase1": "EARLY_PHASE1",
+}
+
+
+def _normalize_phase(phase: str) -> str:
+    """Normalize any phase input to the API's PHASE1/PHASE2/PHASE3/PHASE4 format."""
+    return PHASE_NORMALIZE.get(phase.lower().strip(), phase.upper().replace(" ", ""))
+
+
+
+# FIX: Map all frontend status variants to the exact API enum values.
+STATUS_NORMALIZE: dict[str, str] = {
+    "recruiting":               "RECRUITING",
+    "not yet recruiting":       "NOT_YET_RECRUITING",
+    "not_yet_recruiting":       "NOT_YET_RECRUITING",
+    "notyetrecruiting":         "NOT_YET_RECRUITING",
+    "active, not recruiting":   "ACTIVE_NOT_RECRUITING",
+    "active not recruiting":    "ACTIVE_NOT_RECRUITING",
+    "active_not_recruiting":    "ACTIVE_NOT_RECRUITING",
+    "completed":                "COMPLETED",
+    "terminated":               "TERMINATED",
+    "withdrawn":                "WITHDRAWN",
+    "unknown":                  "UNKNOWN",
+    "enrolling by invitation":  "ENROLLING_BY_INVITATION",
+}
+
+def _normalize_status(status: str) -> str | None:
+    """Normalize frontend status string to exact ClinicalTrials API enum value."""
+    if not status or not status.strip():
+        return None
+    return STATUS_NORMALIZE.get(status.lower().strip(), status.upper().replace(" ", "_"))
+
 def fetch_trials(
     condition: str,
     location: str = "",
     specialty: str = "",
     limit: int = 20,
     offset: int = 0,
+    us_only: bool = True,       # FIX: default True to suppress non-US trials
+    status: str = "",           # FIX: send status to API directly
 ) -> tuple[list, int]:
-    location_query = _expand_location(location)
+    location_query = _expand_location(location, us_only=us_only)
     condition_query = _expand_condition(condition)
 
     params = {
@@ -147,6 +194,11 @@ def fetch_trials(
         params["query.locn"] = location_query
     # FIX Bug 4: specialty now actually sent to the API via query.term
     if specialty and specialty.strip():
+        params["query.term"] = specialty.strip()
+    if status and status.strip():
+        normalized = _normalize_status(status)
+        if normalized:
+            params["filter.overallStatus"] = normalized  # FIX: pre-filter at API level
         params["query.term"] = specialty.strip()
     if offset > 0:
         page_token = _get_page_token(params, offset)
@@ -249,6 +301,8 @@ def fetch_trials_with_filters(
         specialty=filters.get("specialty", ""),
         limit=limit * 5,
         offset=offset,
+        us_only=filters.get("us_only", True),
+        status=filters.get("status", ""),       # FIX: pass status to API for pre-filtering
     )
 
     filtered = []
@@ -257,12 +311,20 @@ def fetch_trials_with_filters(
         # The ClinicalTrials API already handles condition matching via query.cond.
 
         if filters.get("status"):
-            if filters["status"].upper() not in trial.get("status", "").upper():
+            # FIX: Use exact normalized match, not substring.
+            # Old: "RECRUITING" in "NOT_YET_RECRUITING" == True (wrong!)
+            # New: normalize both sides and require exact equality.
+            required_status = _normalize_status(filters["status"])
+            trial_status = _normalize_status(trial.get("status", ""))
+            if required_status and trial_status != required_status:
                 continue
 
         if filters.get("phase"):
-            phases = [p.upper() for p in trial.get("phases", [])]
-            if not any(filters["phase"].upper() in p for p in phases):
+            # FIX: Normalize both the filter value and trial phases before comparing.
+            # The API returns "PHASE1" but frontend might send "Phase 1", "phase1", "1" etc.
+            normalized_filter_phase = _normalize_phase(filters["phase"])
+            phases = [_normalize_phase(p) for p in trial.get("phases", [])]
+            if normalized_filter_phase not in phases:
                 continue
 
         if filters.get("city") or filters.get("state"):
