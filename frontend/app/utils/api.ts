@@ -1,3 +1,9 @@
+/**
+ * api.ts
+ * Pure data-fetching utilities.
+ * No geocoding here — all geocoding is handled by utils/geocode.ts (Geoapify only).
+ */
+
 const baseUrl =
   process.env.NEXT_PUBLIC_API_URL || "https://trial-physician-finder.onrender.com";
 
@@ -13,15 +19,23 @@ export async function fetchTrials(
   if (limit) params.append("limit", String(limit));
 
   const res = await fetch(`${baseUrl}/api/trials/?${params}`);
+  if (!res.ok) {
+    console.error(`Trials API error: ${res.status}`);
+    throw new Error(`Failed to fetch trials: ${res.status}`);
+  }
   const data = await res.json();
   return data.trials ?? [];
 }
 
-// All params optional — omit city+state for national results
+/**
+ * Fetch physicians near a city/state for a given condition.
+ * Omit city + state to get national results.
+ * Note: coordinate resolution for map display is done separately via geocode.ts.
+ */
 export async function fetchPhysicians(
   city?: string,
   state?: string,
-  condition?: string  // sent as "condition", mapped to specialty on backend
+  condition?: string
 ) {
   const params = new URLSearchParams();
   if (city) params.append("city", city);
