@@ -3,7 +3,7 @@
 import { useState } from "react";
 import PhysicianFilters from "./components/PhysicianFilters";
 import TrialCard from "./components/TrialCard";
-import MapView from "./components/MapView";
+import MapView from "./components/MapView-MAPQUEST";
 import { Trial, TrialLocation, Physician } from "./types";
 import { useTrials } from "./hooks/useTrials";
 
