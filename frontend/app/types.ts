@@ -32,6 +32,7 @@ export interface Physician {
   name: string;
   credential: string;
   taxonomyDescription: string;
+  taxonomyCode?: string;
   specialty: string;
   city: string;
   state: string;
