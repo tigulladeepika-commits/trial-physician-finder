@@ -1,147 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-interface PhysicianFiltersProps {
-  onFilterChange: (filters: {
-    condition: string;
-    city: string;
-    state: string;
-    specialty: string;
-    status: string;
-    phase: string;
-  }) => void;
-}
+type Filters = {
+  specialty: string;
+  radius: number;
+  city: string;
+};
 
-const SPECIALTIES = [
-  "Cardiology",
-  "Oncology",
-  "Endocrinology",
-  "Neurology",
-  "Pulmonology",
-  "Gastroenterology",
-  "Nephrology",
-  "Rheumatology",
-  "Infectious Disease",
-  "Allergy/Immunology",
-];
+type Props = {
+  filters: Filters;
+  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+  specialties: string[];
+  loading?: boolean;
+};
 
-const STATUSES = [
-  "Recruiting",
-  "Active, not recruiting",
-  "Completed",
-  "Not yet recruiting",
-  "Suspended",
-];
+export default function PhysicianFilters({
+  filters,
+  setFilters,
+  specialties,
+  loading = false,
+}: Props) {
+  // Local city state so we can debounce — avoids a fetch on every keypress
+  const [cityInput, setCityInput] = useState(filters.city);
 
-const PHASES = [
-  "Phase 1",
-  "Phase 2",
-  "Phase 3",
-  "Phase 4",
-  "Phase 1/2",
-  "Phase 2/3",
-];
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters((f) => ({ ...f, city: cityInput }));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [cityInput, setFilters]);
 
-export function PhysicianFilters({ onFilterChange }: PhysicianFiltersProps) {
-  const [filters, setFilters] = useState({
-    condition: "",
-    city: "",
-    state: "",
-    specialty: "",
-    status: "",
-    phase: "",
-  });
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onFilterChange(filters);
-  };
-
-  const handleReset = () => {
-    setFilters({
-      condition: "",
-      city: "",
-      state: "",
-      specialty: "",
-      status: "",
-      phase: "",
-    });
-    onFilterChange({
-      condition: "",
-      city: "",
-      state: "",
-      specialty: "",
-      status: "",
-      phase: "",
-    });
-  };
+  // Keep local input in sync if filters.city is reset externally
+  useEffect(() => {
+    setCityInput(filters.city);
+  }, [filters.city]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="p-4 border rounded space-y-3">
+      {/* Specialty filter */}
       <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Condition / Disease
-        </label>
-        <input
-          type="text"
-          name="condition"
-          value={filters.condition}
-          onChange={handleChange}
-          placeholder="e.g., diabetes, cancer"
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            City
-          </label>
-          <input
-            type="text"
-            name="city"
-            value={filters.city}
-            onChange={handleChange}
-            placeholder="e.g., Los Angeles"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            State
-          </label>
-          <input
-            type="text"
-            name="state"
-            value={filters.state}
-            onChange={handleChange}
-            placeholder="e.g., CA"
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Specialty
         </label>
         <select
-          name="specialty"
+          className="border p-2 w-full rounded disabled:opacity-50"
           value={filters.specialty}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          disabled={loading}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, specialty: e.target.value }))
+          }
         >
           <option value="">All Specialties</option>
-          {SPECIALTIES.map((s) => (
+          {specialties.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
@@ -149,61 +60,55 @@ export function PhysicianFilters({ onFilterChange }: PhysicianFiltersProps) {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Status
-          </label>
-          <select
-            name="status"
-            value={filters.status}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">All Statuses</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* City filter — debounced */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Filter by City
+        </label>
+        <input
+          className="border p-2 w-full rounded disabled:opacity-50"
+          placeholder="e.g. Boston"
+          value={cityInput}
+          disabled={loading}
+          onChange={(e) => setCityInput(e.target.value)}
+        />
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Phase
-          </label>
-          <select
-            name="phase"
-            value={filters.phase}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">All Phases</option>
-            {PHASES.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+      {/* Radius filter */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Radius: {filters.radius > 0 ? `${filters.radius} km` : "Any"}
+        </label>
+        <input
+          type="range"
+          min={0}
+          max={500}
+          step={25}
+          className="w-full disabled:opacity-50"
+          value={filters.radius}
+          disabled={loading}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, radius: Number(e.target.value) }))
+          }
+        />
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>Any</span>
+          <span>500 km</span>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      {/* Clear filters */}
+      {(filters.specialty || filters.city || filters.radius > 0) && (
         <button
-          type="submit"
-          className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          className="text-sm text-blue-600 underline hover:text-blue-800"
+          onClick={() => {
+            setCityInput("");
+            setFilters({ specialty: "", radius: 0, city: "" });
+          }}
         >
-          Apply Filters
+          Clear filters
         </button>
-        <button
-          type="button"
-          onClick={handleReset}
-          className="rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50"
-        >
-          Reset
-        </button>
-      </div>
-    </form>
+      )}
+    </div>
   );
 }

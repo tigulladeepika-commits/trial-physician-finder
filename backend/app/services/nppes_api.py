@@ -1,6 +1,7 @@
 import httpx
 import logging
 import asyncio
+import math
 from app.services.mapquest_api import geocode_address
 
 logger = logging.getLogger(__name__)
@@ -50,52 +51,52 @@ NON_PHYSICIAN_TAXONOMY_CODES = {
 }
 
 CONDITION_TO_TAXONOMY_CODES = {
-    "breast cancer":  ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X", "207VG0400X"],
-    "cancer":         ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
-    "tumor":          ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
-    "lymphoma":       ["207RH0003X", "207RH0000X", "207RX0202X"],
-    "leukemia":       ["207RH0003X", "207RH0000X", "207RX0202X"],
-    "melanoma":       ["207RH0003X", "207RX0202X", "207N00000X"],
-    "carcinoma":      ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
-    "neoplasm":       ["207RH0003X", "207RX0202X"],
-    "prostate":       ["207RH0003X", "207RX0202X", "208800000X", "2085R0001X"],
-    "colorectal":     ["207RH0003X", "207RX0202X", "208C00000X", "207RG0100X"],
-    "lung cancer":    ["207RH0003X", "207RX0202X", "207RP1001X", "208G00000X"],
-    "sarcoma":        ["207RH0003X", "207RX0202X", "207X00000X"],
-    "myeloma":        ["207RH0003X", "207RH0000X", "207RX0202X"],
-    "renal":          ["207RH0003X", "207RX0202X", "207RN0300X", "208800000X"],
-    "kidney":         ["207RN0300X", "208800000X", "207RH0003X"],
-    "heart":          ["207RC0000X", "207RC0001X"],
-    "cardiac":        ["207RC0000X", "207RC0001X"],
-    "cardiovascular": ["207RC0000X"],
-    "hypertension":   ["207RC0000X", "207R00000X", "207RN0300X"],
-    "arrhythmia":     ["207RC0001X", "207RC0000X"],
-    "stroke":         ["2084N0400X", "2084V0102X", "207RC0000X"],
-    "coronary":       ["207RC0000X"],
-    "diabetes":       ["207RE0101X", "207R00000X"],
-    "thyroid":        ["207RE0101X"],
-    "obesity":        ["207RE0101X", "207R00000X"],
-    "alzheimer":      ["2084N0400X", "207QG0300X"],
-    "parkinson":      ["2084N0400X"],
-    "epilepsy":       ["2084N0400X", "2084E0001X"],
-    "migraine":       ["2084N0400X", "2084H0002X"],
+    "breast cancer":      ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X", "207VG0400X"],
+    "cancer":             ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
+    "tumor":              ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
+    "lymphoma":           ["207RH0003X", "207RH0000X", "207RX0202X"],
+    "leukemia":           ["207RH0003X", "207RH0000X", "207RX0202X"],
+    "melanoma":           ["207RH0003X", "207RX0202X", "207N00000X"],
+    "carcinoma":          ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
+    "neoplasm":           ["207RH0003X", "207RX0202X"],
+    "prostate":           ["207RH0003X", "207RX0202X", "208800000X", "2085R0001X"],
+    "colorectal":         ["207RH0003X", "207RX0202X", "208C00000X", "207RG0100X"],
+    "lung cancer":        ["207RH0003X", "207RX0202X", "207RP1001X", "208G00000X"],
+    "sarcoma":            ["207RH0003X", "207RX0202X", "207X00000X"],
+    "myeloma":            ["207RH0003X", "207RH0000X", "207RX0202X"],
+    "renal":              ["207RH0003X", "207RX0202X", "207RN0300X", "208800000X"],
+    "kidney":             ["207RN0300X", "208800000X", "207RH0003X"],
+    "heart":              ["207RC0000X", "207RC0001X"],
+    "cardiac":            ["207RC0000X", "207RC0001X"],
+    "cardiovascular":     ["207RC0000X"],
+    "hypertension":       ["207RC0000X", "207R00000X", "207RN0300X"],
+    "arrhythmia":         ["207RC0001X", "207RC0000X"],
+    "stroke":             ["2084N0400X", "2084V0102X", "207RC0000X"],
+    "coronary":           ["207RC0000X"],
+    "diabetes":           ["207RE0101X", "207R00000X"],
+    "thyroid":            ["207RE0101X"],
+    "obesity":            ["207RE0101X", "207R00000X"],
+    "alzheimer":          ["2084N0400X", "207QG0300X"],
+    "parkinson":          ["2084N0400X"],
+    "epilepsy":           ["2084N0400X", "2084E0001X"],
+    "migraine":           ["2084N0400X", "2084H0002X"],
     "multiple sclerosis": ["2084N0400X"],
-    "asthma":         ["207RP1001X", "207K00000X"],
-    "copd":           ["207RP1001X", "207R00000X"],
-    "crohn":          ["207RG0100X", "207R00000X"],
-    "colitis":        ["207RG0100X", "207R00000X"],
-    "hepatitis":      ["207RG0100X", "207RI0008X"],
-    "arthritis":      ["207RR0500X", "207R00000X"],
-    "lupus":          ["207RR0500X"],
-    "rheumatoid":     ["207RR0500X"],
-    "depression":     ["2084P0800X", "2084P0804X"],
-    "anxiety":        ["2084P0800X", "2084P0804X"],
-    "schizophrenia":  ["2084P0800X"],
-    "bipolar":        ["2084P0800X"],
-    "ptsd":           ["2084P0800X"],
-    "adhd":           ["2084P0800X", "2084P0804X", "208000000X"],
-    "hiv":            ["207RI0200X", "207R00000X"],
-    "bladder":        ["208800000X"],
+    "asthma":             ["207RP1001X", "207K00000X"],
+    "copd":               ["207RP1001X", "207R00000X"],
+    "crohn":              ["207RG0100X", "207R00000X"],
+    "colitis":            ["207RG0100X", "207R00000X"],
+    "hepatitis":          ["207RG0100X", "207RI0008X"],
+    "arthritis":          ["207RR0500X", "207R00000X"],
+    "lupus":              ["207RR0500X"],
+    "rheumatoid":         ["207RR0500X"],
+    "depression":         ["2084P0800X", "2084P0804X"],
+    "anxiety":            ["2084P0800X", "2084P0804X"],
+    "schizophrenia":      ["2084P0800X"],
+    "bipolar":            ["2084P0800X"],
+    "ptsd":               ["2084P0800X"],
+    "adhd":               ["2084P0800X", "2084P0804X", "208000000X"],
+    "hiv":                ["207RI0200X", "207R00000X"],
+    "bladder":            ["208800000X"],
 }
 
 STATE_ABBR = {
@@ -114,7 +115,6 @@ STATE_ABBR = {
     "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC", "puerto rico": "PR",
 }
 
-# Full taxonomy code → display description
 CODE_TO_DESCRIPTION = {
     "207R00000X": "Internal Medicine",
     "207RB0002X": "Obesity Medicine",
@@ -217,11 +217,16 @@ CODE_TO_DESCRIPTION = {
     "2083C0008X": "Clinical Informatics",
 }
 
+# Reverse lookup: description → code (for specialty string → taxonomy code mapping)
+DESCRIPTION_TO_CODE: dict[str, str] = {v: k for k, v in CODE_TO_DESCRIPTION.items()}
+
 
 def get_taxonomy_codes_for_condition(condition: str) -> list[str]:
+    """Map a condition string to NPPES taxonomy codes via keyword matching."""
     if not condition:
         return []
     condition_lower = condition.lower().strip()
+    # Longest-match first to prefer specific over generic (e.g. "lung cancer" > "cancer")
     for keyword in sorted(CONDITION_TO_TAXONOMY_CODES.keys(), key=len, reverse=True):
         if keyword in condition_lower:
             codes = CONDITION_TO_TAXONOMY_CODES[keyword]
@@ -229,6 +234,30 @@ def get_taxonomy_codes_for_condition(condition: str) -> list[str]:
             return codes
     logger.info(f"No code mapping for '{condition}' — using general physician codes.")
     return ["207R00000X", "207RH0003X", "207RX0202X"]
+
+
+def get_taxonomy_codes_for_specialty(specialty: str) -> list[str]:
+    """
+    Map a human-readable specialty string (e.g. 'Neurology') to taxonomy codes.
+    Falls back to condition mapping if no direct match found.
+    """
+    if not specialty:
+        return []
+    # Try exact description match first
+    code = DESCRIPTION_TO_CODE.get(specialty.strip())
+    if code:
+        return [code]
+    # Try case-insensitive partial match
+    specialty_lower = specialty.lower().strip()
+    matches = [
+        code for desc, code in DESCRIPTION_TO_CODE.items()
+        if specialty_lower in desc.lower()
+    ]
+    if matches:
+        logger.info(f"Specialty '{specialty}' matched codes: {matches}")
+        return matches
+    # Fall back to condition-style keyword matching
+    return get_taxonomy_codes_for_condition(specialty)
 
 
 def normalize_state(state: str) -> str | None:
@@ -240,6 +269,16 @@ def normalize_state(state: str) -> str | None:
     if len(s) == 2:
         return s.upper()
     return STATE_ABBR.get(s.lower(), s.upper())
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Returns the great-circle distance in km between two lat/lon points."""
+    R = 6371.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def _is_physician(taxonomies: list) -> bool:
@@ -260,7 +299,7 @@ async def _query_nppes(
     params = {
         "version": "2.1",
         "enumeration_type": "NPI-1",
-        "limit": limit,
+        "limit": min(limit, 200),  # NPPES hard cap is 200
     }
     if city:
         params["city"] = city.strip()
@@ -282,7 +321,10 @@ async def _query_nppes(
         return []
 
     raw = data.get("results", [])
-    logger.info(f"NPPES returned {len(raw)} raw results (city={city}, state={state}, taxonomy={taxonomy_description})")
+    logger.info(
+        f"NPPES returned {len(raw)} raw results "
+        f"(city={city}, state={state}, taxonomy={taxonomy_description})"
+    )
     return raw
 
 
@@ -316,7 +358,6 @@ def _parse_physician(item: dict, expected_city: str | None = None) -> dict | Non
         or "Unknown"
     )
 
-    credential = (basic.get("credential") or "").strip()
     full_address = (
         f"{practice_address.get('address_1', '')}, "
         f"{practice_address.get('city', '')}, "
@@ -327,14 +368,14 @@ def _parse_physician(item: dict, expected_city: str | None = None) -> dict | Non
     return {
         "npi": item.get("number"),
         "name": f"{basic.get('first_name', '')} {basic.get('last_name', '')}".strip(),
-        "credential": credential,
+        "credential": (basic.get("credential") or "").strip(),
         "city": practice_address.get("city"),
         "state": practice_address.get("state"),
         "address": practice_address.get("address_1"),
         "postal_code": practice_address.get("postal_code"),
         "specialty": taxonomy_description,
-        "taxonomyCode": taxonomy_code,               # ← NEW
-        "taxonomyDescription": taxonomy_description, # ← NEW
+        "taxonomyCode": taxonomy_code,
+        "taxonomyDescription": taxonomy_description,
         "full_address": full_address,
     }
 
@@ -343,25 +384,56 @@ async def fetch_physicians_near(
     city: str | None = None,
     state: str | None = None,
     condition: str | None = None,
+    specialty: str | None = None,   # ← explicit specialty filter from frontend
+    radius: int | None = None,      # ← radius filter in km from frontend
     limit: int = 10,
 ) -> list:
+    """
+    Fetch physicians from NPPES filtered by location, condition/specialty, and radius.
+
+    Priority:
+      1. If `specialty` is provided explicitly, use it directly (user chose from dropdown).
+      2. Otherwise derive taxonomy codes from `condition` string.
+    """
     state_code = normalize_state(state) if state else None
-    taxonomy_codes = get_taxonomy_codes_for_condition(condition) if condition else []
+
+    # Specialty param takes priority over condition-derived mapping
+    if specialty and specialty.strip():
+        taxonomy_codes = get_taxonomy_codes_for_specialty(specialty)
+        logger.info(f"Using explicit specialty '{specialty}' → codes {taxonomy_codes}")
+    elif condition and condition.strip():
+        taxonomy_codes = get_taxonomy_codes_for_condition(condition)
+    else:
+        taxonomy_codes = []
 
     logger.info(
-        f"Fetching physicians: city={city}, state={state_code}, "
-        f"condition={condition}, taxonomy_codes={taxonomy_codes}"
+        f"fetch_physicians_near: city={city}, state={state_code}, "
+        f"condition={condition}, specialty={specialty}, "
+        f"radius={radius}km, limit={limit}, codes={taxonomy_codes}"
     )
 
+    # Geocode the search centre for radius filtering
+    origin_coords: tuple[float, float] | None = None
+    if radius and radius > 0 and city:
+        try:
+            geo = await geocode_address(f"{city}, {state_code or ''}")
+            if geo.get("lat") and geo.get("lon"):
+                origin_coords = (geo["lat"], geo["lon"])
+                logger.info(f"Search origin geocoded: {origin_coords}")
+        except Exception as e:
+            logger.warning(f"Could not geocode search origin: {e}")
+
     seen_npis: set = set()
-    physicians_to_geocode: list = []
+    # Fetch more than needed so radius filtering still yields enough results
+    fetch_limit = min((limit or 10) * 6, 200)
+    candidates: list[dict] = []
 
     async def collect(query_city, query_state, strict_city, codes):
         for code in codes:
-            if len(physicians_to_geocode) >= limit:
+            if len(candidates) >= fetch_limit:
                 break
             desc = CODE_TO_DESCRIPTION.get(code, "Internal Medicine")
-            raw_results = await _query_nppes(query_city, query_state, limit * 5, desc)
+            raw_results = await _query_nppes(query_city, query_state, fetch_limit, desc)
             for item in raw_results:
                 npi = item.get("number")
                 if npi in seen_npis:
@@ -369,37 +441,33 @@ async def fetch_physicians_near(
                 seen_npis.add(npi)
                 parsed = _parse_physician(item, expected_city=strict_city)
                 if parsed:
-                    physicians_to_geocode.append(parsed)
-                if len(physicians_to_geocode) >= limit:
+                    candidates.append(parsed)
+                if len(candidates) >= fetch_limit:
                     break
 
     if taxonomy_codes:
         await collect(city, state_code, strict_city=city, codes=taxonomy_codes)
-        if not physicians_to_geocode and state_code:
-            logger.warning(f"No results in city={city}. Trying state={state_code}.")
+        # Widen to state if city search returned nothing
+        if not candidates and state_code:
+            logger.warning(f"No results for city={city}. Widening to state={state_code}.")
             await collect(None, state_code, strict_city=None, codes=taxonomy_codes)
-        if not physicians_to_geocode:
-            logger.warning("No specialty matches. Falling back to unfiltered physician search.")
-            raw_results = await _query_nppes(city, state_code, limit * 5)
-            for item in raw_results:
-                parsed = _parse_physician(item, expected_city=city)
-                if parsed:
-                    physicians_to_geocode.append(parsed)
-                if len(physicians_to_geocode) >= limit:
-                    break
-    else:
-        raw_results = await _query_nppes(city, state_code, limit * 5)
+    
+    # Final fallback: unfiltered physician search
+    if not candidates:
+        logger.warning("No specialty matches. Falling back to unfiltered physician search.")
+        raw_results = await _query_nppes(city, state_code, fetch_limit)
         for item in raw_results:
             parsed = _parse_physician(item, expected_city=city)
             if parsed:
-                physicians_to_geocode.append(parsed)
-            if len(physicians_to_geocode) >= limit:
+                candidates.append(parsed)
+            if len(candidates) >= fetch_limit:
                 break
 
-    logger.info(f"Found {len(physicians_to_geocode)} physicians before geocoding.")
-    if not physicians_to_geocode:
+    logger.info(f"Found {len(candidates)} candidates before geocoding/radius filter.")
+    if not candidates:
         return []
 
+    # Geocode all candidates in parallel
     async def geocode_physician(p: dict) -> dict:
         try:
             geo = await geocode_address(p["full_address"])
@@ -412,6 +480,27 @@ async def fetch_physicians_near(
             "lon": geo.get("lon"),
         }
 
-    results = await asyncio.gather(*[geocode_physician(p) for p in physicians_to_geocode])
-    logger.info(f"Returning {len(results)} physicians.")
-    return list(results)[:5]
+    geocoded = await asyncio.gather(*[geocode_physician(p) for p in candidates])
+
+    # Apply radius filter now that we have coordinates
+    if origin_coords and radius and radius > 0:
+        origin_lat, origin_lon = origin_coords
+        filtered = []
+        for p in geocoded:
+            if p.get("lat") and p.get("lon"):
+                dist_km = _haversine_km(origin_lat, origin_lon, p["lat"], p["lon"])
+                if dist_km <= radius:
+                    p["distanceKm"] = round(dist_km, 1)
+                    filtered.append(p)
+            # Include physicians we couldn't geocode so we don't silently drop them
+            else:
+                p["distanceKm"] = None
+                filtered.append(p)
+        # Sort by distance ascending when radius filter is active
+        filtered.sort(key=lambda x: x.get("distanceKm") or float("inf"))
+        geocoded = filtered
+        logger.info(f"{len(geocoded)} physicians within {radius}km radius.")
+
+    result = list(geocoded)[:limit]   # ← honour the actual limit param (was hardcoded to 5)
+    logger.info(f"Returning {len(result)} physicians.")
+    return result

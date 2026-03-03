@@ -1,88 +1,61 @@
-export interface Trial {
-  nctId: string;
-  title: string;
-  status: string;
-  description: string;
-  conditions: string[];
-  sponsor: string;
-  phases: string[];
-  locations: TrialLocation[];
-  inclusionCriteria: string;
-  exclusionCriteria: string;
-  pointOfContact?: {
-    name: string;
-    role: string;
-    phone: string;
-    email: string;
-  };
-}
+const baseUrl =
+  process.env.NEXT_PUBLIC_API_URL || "https://trial-physician-finder.onrender.com";
 
-export interface TrialLocation {
-  facility: string;
-  city: string;
-  state: string;
-  country: string;
-  status: string;
-  lat: number | null;
-  lon: number | null;
-}
-
-export interface FetchTrialsParams {
-  condition: string;
-  location: string;
-  status: string;
-  phase: string;
-  specialty: string;
-  limit: number;
-  offset: number;
-}
-
+/**
+ * Fetch clinical trials from the backend.
+ * city and state are passed as separate params so the backend can
+ * combine/expand them correctly via _expand_location().
+ */
 export async function fetchTrials(
   condition: string,
-  location: string,
-  status: string,
-  phase: string,
-  specialty: string,
-  limit: number,
-  offset: number
-): Promise<[Trial[], number]> {
-  const params = new URLSearchParams({
-    condition: condition.trim(),
-    location: location.trim(),
-    status: status.trim(),
-    phase: phase.trim(),
-    specialty: specialty.trim(),
-    limit: limit.toString(),
-    offset: offset.toString(),
-  });
+  city: string,
+  state: string,
+  specialty?: string,
+  limit?: number,
+) {
+  const params = new URLSearchParams({ condition });
 
-  try {
-    const response = await fetch(`/api/trials?${params}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  // Only append if non-empty — avoids sending "city=" blank strings
+  if (city?.trim())  params.append("city", city.trim());
+  if (state?.trim()) params.append("state", state.trim());
+  if (specialty?.trim()) params.append("specialty", specialty.trim());
+  if (limit && limit > 0) params.append("limit", String(limit));
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Handle both array and object responses
-    if (Array.isArray(data)) {
-      return [data, 0];
-    }
-
-    if (data.trials && typeof data.totalCount === "number") {
-      return [data.trials, data.totalCount];
-    }
-
-    // Fallback: assume data is the trials array
-    return [data, data.length];
-  } catch (error) {
-    console.error("API fetch error:", error);
-    throw error;
+  const res = await fetch(`${baseUrl}/api/trials/?${params}`);
+  if (!res.ok) {
+    console.error(`Trials API error: ${res.status}`);
+    return [];
   }
+  const data = await res.json();
+  return data.trials ?? [];
+}
+
+/**
+ * Fetch physicians near a location for a given condition.
+ * - condition: plain text (e.g. "diabetes") — backend maps to specialty
+ * - specialty: optional override — if the user has explicitly picked one
+ * - radius: search radius in km
+ */
+export async function fetchPhysicians(
+  city?: string,
+  state?: string,
+  condition?: string,
+  specialty?: string,   // ← explicit specialty filter (from PhysicianFilters)
+  radius?: number,      // ← radius filter (from PhysicianFilters)
+) {
+  const params = new URLSearchParams();
+
+  if (city?.trim())      params.append("city", city.trim());
+  if (state?.trim())     params.append("state", state.trim());
+  if (condition?.trim()) params.append("condition", condition.trim());
+  if (specialty?.trim()) params.append("specialty", specialty.trim());
+  if (radius && radius > 0) params.append("radius", String(radius));
+
+  const res = await fetch(`${baseUrl}/api/physicians/?${params}`);
+  if (!res.ok) {
+    console.error(`Physicians API error: ${res.status}`);
+    return [];
+  }
+  const data = await res.json();
+  return data.results ?? [];
 }

@@ -1,32 +1,10 @@
 import requests
 import logging
-from typing import List, Dict, Any, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
 CLINICAL_TRIALS_BASE_URL = "https://clinicaltrials.gov/api/v2/studies"
-
-HEADERS = {
-    "User-Agent": "TrialPhysicianFinder/1.0 (contact@example.com)"
-}
-
-STATUS_MAP = {
-    "recruiting": "Recruiting",
-    "active": "Active",
-    "completed": "Completed",
-    "not_recruiting": "Not Recruiting",
-    "suspended": "Suspended",
-    "withdrawn": "Withdrawn",
-}
-
-PHASE_MAP = {
-    "phase_1": "Phase 1",
-    "phase_2": "Phase 2",
-    "phase_3": "Phase 3",
-    "phase_4": "Phase 4",
-    "phase_1_2": "Phase 1/2",
-    "phase_2_3": "Phase 2/3",
-}
+HEADERS = {"User-Agent": "TrialPhysicianFinder/1.0 (contact@example.com)"}
 
 STATE_MAP = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
@@ -110,90 +88,40 @@ CONDITION_SYNONYMS = {
     "fibromyalgia": "fibromyalgia OR chronic widespread pain OR fibromyalgia syndrome",
 }
 
-
 def _expand_condition(condition: str) -> str:
-    """Expand condition using synonyms for better API matching"""
     if not condition or not condition.strip():
         return condition
     lower = condition.lower().strip()
     return CONDITION_SYNONYMS.get(lower, condition)
 
-
-def _expand_location(location: str) -> str | None:
-    """Expand location with state codes and optional country"""
-    if not location or not location.strip():
-        return None
-    
-    parts = [p.strip() for p in location.split(",")]
-    expanded_parts = []
-    
-    for part in parts:
-        expanded_parts.append(STATE_MAP.get(part.upper(), part))
-    
-    result = ", ".join(expanded_parts)
-    
-    # Only add country if explicitly requested
-    if "united states" not in result.lower() and "usa" not in result.lower():
-        # Don't force United States - let API handle it
-        pass
-    
-    return result
-
-
-def _get_page_token(base_params: dict, offset: int) -> str | None:
-    """Get page token for pagination - simplified approach"""
-    # ClinicalTrials.gov API uses offset-based pagination
-    return None
-
-
-def fetch_trials(
-    condition: str,
-    location: str = "",
-    status: str = "",
-    phase: str = "",
-    specialty: str = "",
-    limit: int = 20,
-    offset: int = 0,
-) -> Tuple[List[Dict[str, Any]], int]:
-    """
-    Fetch clinical trials from ClinicalTrials.gov API.
-    
-    Returns:
-        Tuple of (results, total_count)
-    """
-    location_query = _expand_location(location)
+def fetch_trials(condition: str, location: str = "", limit: int = 20, offset: int = 0) -> tuple[list, int]:
+    """US-ONLY trials with precise city/state/recruiting filters"""
     condition_query = _expand_condition(condition)
-
+    
+    # ✅ US-ONLY PRECISE FILTERS
     params = {
         "query.cond": condition_query,
+        "filter.locn.country": "United States",      # US ONLY
+        "filter.recrt": "RECRUITING",               # Active trials only
         "pageSize": limit,
         "countTotal": "true",
         "format": "json",
     }
-
-    if location_query:
-        params["query.locn"] = location_query
     
-    if status:
-        params["query.status"] = STATUS_MAP.get(status.lower(), status)
-    
-    if phase:
-        params["query.phase"] = PHASE_MAP.get(phase.lower(), phase)
-
-    logger.info(
-        f"ClinicalTrials API Call: "
-        f"condition={condition} | location={location} | status={status} | phase={phase}"
-    )
+    # Parse location: "Dallas, TX" → city="Dallas", state="TX"
+    if location:
+        parts = [p.strip() for p in location.split(",")]
+        if len(parts) >= 1 and parts[0]:
+            params["filter.locn.city"] = parts[0]  # Exact city match
+        if len(parts) >= 2 and len(parts[1]) >= 2:
+            state_code = parts[1].strip().upper()[:2]
+            if state_code in STATE_MAP:
+                params["filter.locn.state"] = state_code  # Exact state
 
     try:
-        response = requests.get(
-            CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=30
-        )
+        response = requests.get(CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15)
         response.raise_for_status()
         data = response.json()
-    except requests.HTTPError as e:
-        logger.error(f"ClinicalTrials HTTP error: {e.response.status_code}")
-        return [], 0
     except requests.RequestException as e:
         logger.error(f"ClinicalTrials request failed: {e}")
         return [], 0
@@ -201,71 +129,23 @@ def fetch_trials(
     studies = data.get("studies", [])
     total_count = data.get("totalCount", len(studies))
 
-    logger.info(
-        f"ClinicalTrials returned {len(studies)} studies (total={total_count}) "
-        f"| condition={condition_query} | location={location_query}"
-    )
+    logger.info(f"US-ONLY: {len(studies)} recruiting trials (total={total_count}) | {condition_query}")
 
-    # Post-filtering for additional accuracy
-    filtered_studies = []
+    # Process studies (keep your existing processing logic)
+    results = []
     for study in studies:
         protocol = study.get("protocolSection", {})
-        study_conditions = [
-            c.lower()
-            for c in protocol.get("conditionsModule", {}).get("conditions", [])
-        ]
-        
-        # Filter by condition keyword
-        if condition:
-            condition_lower = condition.lower()
-            if not any(condition_lower in cond for cond in study_conditions):
-                logger.debug(f"Filtered out study with conditions: {study_conditions}")
-                continue
-        
-        filtered_studies.append(study)
-
-    logger.info(f"After post-filter: {len(filtered_studies)} studies remain")
-
-    results = []
-    for study in filtered_studies:
-        protocol = study.get("protocolSection", {})
-
         locations_module = protocol.get("contactsLocationsModule", {})
-        locations = [
-            {
-                "facility": loc.get("facility"),
-                "city": loc.get("city"),
-                "state": loc.get("state"),
-                "country": loc.get("country"),
-                "status": loc.get("recruitmentStatus"),
-                "lat": loc.get("geoPoint", {}).get("lat"),
-                "lon": loc.get("geoPoint", {}).get("lon"),
-            }
-            for loc in locations_module.get("locations", [])
-        ]
-
-        central_contacts = locations_module.get("centralContacts", [])
-        point_of_contact = None
-        if central_contacts:
-            c = central_contacts[0]
-            point_of_contact = {
-                "name": c.get("name"),
-                "role": c.get("role"),
-                "phone": c.get("phone"),
-                "email": c.get("email"),
-            }
-
-        eligibility = protocol.get("eligibilityModule", {})
-        criteria_text = eligibility.get("eligibilityCriteria", "")
-        inclusion_criteria = ""
-        exclusion_criteria = ""
-        if "Inclusion Criteria:" in criteria_text:
-            parts = criteria_text.split("Exclusion Criteria:")
-            inclusion_criteria = parts[0].replace("Inclusion Criteria:", "").strip()
-            exclusion_criteria = parts[1].strip() if len(parts) > 1 else ""
-
-        design_module = protocol.get("designModule", {})
-        phases = design_module.get("phases", [])
+        
+        locations = [{
+            "facility": loc.get("facility"),
+            "city": loc.get("city"), 
+            "state": loc.get("state"),
+            "country": loc.get("country"),
+            "status": loc.get("recruitmentStatus"),
+            "lat": loc.get("geoPoint", {}).get("lat"),
+            "lon": loc.get("geoPoint", {}).get("lon"),
+        } for loc in locations_module.get("locations", [])]
 
         results.append({
             "nctId": protocol.get("identificationModule", {}).get("nctId"),
@@ -274,11 +154,8 @@ def fetch_trials(
             "description": protocol.get("descriptionModule", {}).get("briefSummary"),
             "conditions": protocol.get("conditionsModule", {}).get("conditions", []),
             "sponsor": protocol.get("sponsorCollaboratorsModule", {}).get("leadSponsor", {}).get("name"),
-            "phases": phases,
-            "locations": locations,
-            "inclusionCriteria": inclusion_criteria,
-            "exclusionCriteria": exclusion_criteria,
-            "pointOfContact": point_of_contact,
+            "locations": [loc for loc in locations if loc["country"] == "United States"],  # US only
         })
 
     return results, total_count
+

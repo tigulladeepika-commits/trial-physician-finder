@@ -1,217 +1,123 @@
 "use client";
 
 import { useState } from "react";
-import { useTrials } from "./hooks/useTrials";
-import TrialCard from "./components/TrialCard";
-import { Trial } from "./types";
-import dynamic from "next/dynamic";
-const TrialMap = dynamic(() => import("./components/TrialMap"), { ssr: false });
+import { PhysicianFilters } from "../components/PhysicianFilters";
+import { PhysicianList } from "../components/PhysicianList";
+import TrialCard from "../components/TrialCard";
+import { Trial } from "../types";
+import { useTrials } from "../hooks/useTrials";
 
-export default function Page() {
-  const [condition, setCondition] = useState("");
-  const [otherTerms, setOtherTerms] = useState("");
-  const [intervention, setIntervention] = useState("");
-  const [location, setLocation] = useState("");
-  const [studyStatus, setStudyStatus] = useState("all");
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
-  const [ageGroup, setAgeGroup] = useState("");
-  const [phase, setPhase] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [searchedLocation, setSearchedLocation] = useState({ city: "", state: "" });
+export default function Home() {
+  const [condition, setCondition] = useState<string | null>(null);
+  const [city, setCity] = useState<string | null>(null);
+  const [state, setState] = useState<string | null>(null);
+  const [specialty, setSpecialty] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [phase, setPhase] = useState<string | undefined>(undefined);
 
-  const parseLocation = (loc: string) => {
-    const parts = loc.split(",").map((s) => s.trim());
-    return { city: parts[0] || "", state: parts[1] || "" };
-  };
-
-  const { city, state } = parseLocation(location);
-
-  const { trials, loading: trialsLoading } = useTrials(
-    submitted ? (condition || " ") : null,
-    submitted ? (city || " ") : null,
-    submitted ? (state || " ") : null,
-    submitted ? otherTerms : undefined,
-    undefined
+  const { trials, loading, totalCount, error, refetch, hasMore, loadMore } = useTrials(
+    condition,
+    city,
+    state,
+    specialty,
+    status,
+    phase
   );
 
-  const handleSearch = () => {
-    const parsed = parseLocation(location);
-    setSearchedLocation(parsed);
-    setSubmitted(true);
-  };
-
-  const handleReset = () => {
-    setCondition("");
-    setOtherTerms("");
-    setIntervention("");
-    setLocation("");
-    setStudyStatus("all");
-    setAgeGroup("");
-    setPhase("");
-    setSubmitted(false);
-    setSearchedLocation({ city: "", state: "" });
+  const handleFilterChange = (filters: {
+    condition: string;
+    city: string;
+    state: string;
+    specialty: string;
+    status: string;
+    phase: string;
+  }) => {
+    setCondition(filters.condition || null);
+    setCity(filters.city || null);
+    setState(filters.state || null);
+    setSpecialty(filters.specialty || undefined);
+    setStatus(filters.status || undefined);
+    setPhase(filters.phase || undefined);
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8f9fa" }}>
-   
-      <header className="page-header">
-        <div className="header-inner">
-          <div className="logo-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <span className="header-title">Trial Physician Finder</span>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-gray-900">Clinical Trial & Physician Finder</h1>
+          <p className="mt-2 text-gray-600">Find clinical trials and matching physicians</p>
         </div>
       </header>
 
-      <main className="main-content">
-        {!submitted && (
-          <div className="hero-section">
-            <div className="hero-eyebrow">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-              Clinical Trial Research Tool
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Filters Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Filters</h2>
+              <PhysicianFilters onFilterChange={handleFilterChange} />
             </div>
-            <h1 className="hero-title">Find physicians for<br/><em>any clinical trial</em></h1>
-            <p className="hero-desc">Search thousands of clinical trials and discover nearby physicians who specialize in treating your condition.</p>
-          </div>
-        )}
-
-        <div className="search-card">
-          <div className="search-card-header">
-            <span className="search-card-title">Search Filters</span>
-            {submitted && <span style={{ fontSize: "12px", color: "#6b7280" }}>All fields optional</span>}
           </div>
 
-          <div className="search-card-body">
-            <div className="field-group">
-              <label className="field-label">Condition / Disease</label>
-              <input className="field-input" placeholder="e.g. breast cancer, diabetes" value={condition}
-                onChange={(e) => setCondition(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Other Terms</label>
-              <input className="field-input" placeholder="e.g. biomarker, genetic" value={otherTerms}
-                onChange={(e) => setOtherTerms(e.target.value)} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Intervention / Treatment</label>
-              <input className="field-input" placeholder="e.g. aspirin, surgery" value={intervention}
-                onChange={(e) => setIntervention(e.target.value)} />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Location</label>
-              <input className="field-input" placeholder="City, State — e.g. Dallas, TX" value={location}
-                onChange={(e) => setLocation(e.target.value)} />
-            </div>
-
-            <div className="field-group full-width">
-              <label className="field-label">Study Status</label>
-              <div className="status-radio-group">
-                <label className="radio-option">
-                  <input type="radio" name="studyStatus" value="all" checked={studyStatus === "all"} onChange={() => setStudyStatus("all")} />
-                  All studies
-                </label>
-                <label className="radio-option">
-                  <input type="radio" name="studyStatus" value="recruiting" checked={studyStatus === "recruiting"} onChange={() => setStudyStatus("recruiting")} />
-                  Recruiting & not yet recruiting
-                </label>
+          {/* Results */}
+          <div className="lg:col-span-2">
+            {loading && (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading trials...</p>
               </div>
-            </div>
+            )}
 
-            <div className="field-group full-width">
-              <button className="more-filters-btn" onClick={() => setShowMoreFilters(!showMoreFilters)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-                </svg>
-                {showMoreFilters ? "Fewer filters" : "More filters"}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                  style={{ transform: showMoreFilters ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-800">{error}</p>
+              </div>
+            )}
 
-            {showMoreFilters && (
-              <div className="more-filters-section">
-                <div className="field-group">
-                  <label className="field-label">Age Group</label>
-                  <select className="field-select" value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)}>
-                    <option value="">Any age</option>
-                    <option value="child">Child (birth–17)</option>
-                    <option value="adult">Adult (18–64)</option>
-                    <option value="older_adult">Older adult (65+)</option>
-                  </select>
+            {!loading && !error && trials.length === 0 && condition && (
+              <div className="text-center py-12">
+                <p className="text-gray-600">No trials found matching your criteria.</p>
+                <button
+                  onClick={refetch}
+                  className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                >
+                  Try Different Filters
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && trials.length > 0 && (
+              <div>
+                <div className="mb-4">
+                  <p className="text-gray-600">
+                    Found {totalCount} trials (showing {trials.length})
+                  </p>
                 </div>
-                <div className="field-group">
-                  <label className="field-label">Study Phase</label>
-                  <select className="field-select" value={phase} onChange={(e) => setPhase(e.target.value)}>
-                    <option value="">Any phase</option>
-                    <option value="early_phase1">Early Phase 1</option>
-                    <option value="phase1">Phase 1</option>
-                    <option value="phase2">Phase 2</option>
-                    <option value="phase3">Phase 3</option>
-                    <option value="phase4">Phase 4</option>
-                    <option value="na">Not Applicable</option>
-                  </select>
+
+                <div className="space-y-4">
+                  {trials.map((trial: Trial) => (
+                    <TrialCard
+                      key={trial.nctId}
+                      trial={trial}
+                      onClick={() => console.log("Trial clicked:", trial.nctId)}
+                    />
+                  ))}
                 </div>
+
+                {hasMore && (
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={loadMore}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+                    >
+                      Load More Trials
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
-
-          <div className="search-card-footer">
-            <button className="btn-reset" onClick={handleReset}>Clear all</button>
-            <button className="btn-search" onClick={handleSearch}>Search trials →</button>
-          </div>
         </div>
-
-        {/* Loading Skeletons */}
-        {submitted && trialsLoading && (
-          <div>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="skeleton-card">
-                <div className="skeleton-line" style={{ width: "70%" }} />
-                <div className="skeleton-line" style={{ width: "30%", marginBottom: "16px" }} />
-                <div className="skeleton-line" style={{ width: "100%", height: "10px" }} />
-                <div className="skeleton-line" style={{ width: "90%", height: "10px" }} />
-                <div className="skeleton-line" style={{ width: "60%", height: "10px" }} />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {submitted && !trialsLoading && trials.length === 0 && (
-          <div style={{ textAlign: "center", padding: "64px 24px", color: "#9ca3af" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px", opacity: 0.5 }}>🔍</div>
-            <div style={{ fontSize: "16px", fontWeight: 500, color: "#6b7280", marginBottom: "6px" }}>No trials found</div>
-            <div style={{ fontSize: "13px" }}>Try broadening your search or using different terms.</div>
-          </div>
-        )}
-
-        {/* Results */}
-        {submitted && !trialsLoading && trials.length > 0 && (
-          <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-              <span style={{ fontSize: "14px", color: "#6b7280" }}>
-                Found <strong style={{ color: "#111827" }}>{trials.length}</strong> trial{trials.length !== 1 ? "s" : ""}
-                {condition && <> for <strong style={{ color: "#111827" }}>{condition}</strong></>}
-                {searchedLocation.city && <> near <strong style={{ color: "#111827" }}>{[searchedLocation.city, searchedLocation.state].filter(Boolean).join(", ")}</strong></>}
-              </span>
-            </div>
-
-            <TrialMap
-              trials={trials}
-              searchedCity={searchedLocation.city}
-              searchedState={searchedLocation.state}
-            />
-
-            {trials.map((trial: Trial) => (
-              <TrialCard key={trial.nctId} trial={trial} />
-            ))}
-          </>
-        )}
       </main>
     </div>
   );
