@@ -124,8 +124,8 @@ export default function TrialCard({ trial }: TrialCardProps) {
 
   return (
     <>
+      {/* ✅ @import removed — Inter is loaded globally via layout.tsx */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         .tc { background:#fff; border:1.5px solid #e8edf5; border-radius:16px; overflow:hidden; font-family:'Inter',sans-serif; transition:border-color 0.2s,box-shadow 0.2s; }
         .tc:hover { border-color:rgba(99,102,241,0.22); box-shadow:0 4px 24px rgba(99,102,241,0.07); }
         .tc-hd { padding:18px 22px 14px; cursor:pointer; user-select:none; }
@@ -308,7 +308,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
                 </div>
               )}
 
-              {/* ── 2. US LOCATIONS — show ALL when expanded ── */}
+              {/* ── 2. US LOCATIONS ── */}
               {usLocations.length > 0 && (
                 <div style={{ marginBottom: "6px" }}>
                   <div className="tc-sec">{"US Locations (" + usLocations.length + ")"}</div>
