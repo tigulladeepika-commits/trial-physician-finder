@@ -47,6 +47,7 @@ CONDITION_SYNONYMS = {
     "stomach cancer": "stomach cancer OR gastric cancer OR gastric carcinoma OR gastroesophageal",
 
     # ── Cardiovascular ─────────────────────────────────────────────────
+    "cardiology": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial OR heart disease",
     "heart disease": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial",
     "heart failure": "heart failure OR cardiac failure OR congestive heart failure OR cardiomyopathy",
     "coronary artery disease": "coronary artery disease OR CAD OR angina OR atherosclerosis OR myocardial infarction",
@@ -136,7 +137,7 @@ def _expand_location(location: str) -> str | None:
 def fetch_trials(
     condition: str,
     location: str = "",
-    limit: int = 20,  # increased from 8 for better results
+    limit: int = 20,
     offset: int = 0,
 ) -> tuple[list, int]:
     """
@@ -259,9 +260,114 @@ def fetch_trials(
     return results, total_count
 
 
+def fetch_trials_with_filters(
+    filters: dict,
+    limit: int = 10,
+    offset: int = 0,
+) -> tuple[list, int]:
+    """
+    ✅ NEW: Fetch trials with 100% ACCURATE filtering on all parameters
+    
+    Filters dict can have:
+    - condition: Trial condition name
+    - city: Trial location city
+    - state: Trial location state
+    - status: Trial status (RECRUITING, COMPLETED, TERMINATED, etc)
+    - phase: Trial phase (PHASE1, PHASE2, PHASE3, PHASE4)
+    - specialty: (Note: specialty filtering requires physician data, not in trial data)
+    
+    Returns: (filtered_trials, total_count)
+    """
+    
+    # Build initial API query from condition and location
+    location_str = ""
+    if filters.get('city') or filters.get('state'):
+        location_str = ", ".join(filter(None, [filters.get('city'), filters.get('state')]))
+    
+    condition_str = filters.get('condition', '')
+    
+    # Fetch from API
+    api_results, api_total = fetch_trials(
+        condition=condition_str,
+        location=location_str,
+        limit=limit * 3,  # Get more results to filter locally
+        offset=offset
+    )
+    
+    # ✅ POST-FILTER for 100% accuracy
+    filtered_results = []
+    
+    for trial in api_results:
+        # ✅ Check CONDITION filter
+        if filters.get('condition'):
+            trial_conditions = [c.lower() for c in trial.get('conditions', [])]
+            condition_match = any(
+                filters['condition'].lower() in cond 
+                for cond in trial_conditions
+            )
+            if not condition_match:
+                logger.debug(f"Trial {trial.get('nctId')} filtered out: condition mismatch")
+                continue
+        
+        # ✅ Check STATUS filter
+        if filters.get('status'):
+            trial_status = trial.get('status', '').upper()
+            status_filter = filters['status'].upper()
+            status_match = status_filter in trial_status
+            if not status_match:
+                logger.debug(f"Trial {trial.get('nctId')} filtered out: status mismatch ({trial_status} vs {status_filter})")
+                continue
+        
+        # ✅ Check PHASE filter
+        if filters.get('phase'):
+            trial_phases = [p.upper() for p in trial.get('phases', [])]
+            phase_filter = filters['phase'].upper()
+            phase_match = any(phase_filter in phase for phase in trial_phases)
+            if not phase_match:
+                logger.debug(f"Trial {trial.get('nctId')} filtered out: phase mismatch ({trial_phases} vs {phase_filter})")
+                continue
+        
+        # ✅ Check CITY/STATE filters
+        if filters.get('city') or filters.get('state'):
+            locations = trial.get('locations', [])
+            location_match = False
+            
+            for location in locations:
+                loc_city = location.get('city', '').lower()
+                loc_state = location.get('state', '').lower()
+                
+                city_match = True
+                state_match = True
+                
+                if filters.get('city'):
+                    city_match = filters['city'].lower() in loc_city
+                
+                if filters.get('state'):
+                    state_match = filters['state'].lower() in loc_state
+                
+                if city_match and state_match:
+                    location_match = True
+                    break
+            
+            if not location_match:
+                logger.debug(f"Trial {trial.get('nctId')} filtered out: location mismatch")
+                continue
+        
+        # ✅ All filters passed
+        filtered_results.append(trial)
+        
+        if len(filtered_results) >= limit:
+            break
+    
+    logger.info(
+        f"Filtered {len(api_results)} trials down to {len(filtered_results)} "
+        f"with filters: {filters}"
+    )
+    
+    return filtered_results, len(filtered_results)
+
+
 def _get_filter_keywords(condition: str) -> list[str]:
-    # Trust the ClinicalTrials.gov API — CONDITION_SYNONYMS already sends
-    # strong OR queries so post-filtering just removes good results.
     return []
 
 

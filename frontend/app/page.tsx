@@ -3,8 +3,7 @@
 import { useState } from "react";
 import PhysicianFilters from "./components/PhysicianFilters";
 import TrialCard from "./components/TrialCard";
-import MapView from "./components/MapView-MAPQUEST";
-import { Trial, TrialLocation, Physician } from "./types";
+import { Trial } from "./types";
 import { useTrials } from "./hooks/useTrials";
 
 export default function Home() {
@@ -18,29 +17,6 @@ export default function Home() {
   const { trials, loading, totalCount, error, refetch, hasMore, loadMore, hasAnyFilter } = useTrials(
     condition, city, state, specialty, status, phase
   );
-
-  // Extract unique trial locations for the map
-  const trialLocations = Array.from(
-    new Map(
-      trials
-        .flatMap((trial: Trial) => trial.locations || [])
-        .map((location: TrialLocation) => [
-          `${location.lat}-${location.lon}`,
-          {
-            lat: location.lat || 0,
-            lon: location.lon || 0,
-          },
-        ])
-    ).values()
-  ).filter((loc) => loc.lat !== 0 && loc.lon !== 0);
-
-  // Get physicians data (you'll need to fetch this from your API)
-  const physicians: Physician[] = [];
-
-  // Default center (could be based on city/state filters)
-  const mapCenter: [number, number] = city && state 
-    ? [40.7128, -74.0060] // Replace with actual geocoding based on city/state
-    : [39.8283, -98.5795]; // Center of USA
 
   const handleFilterChange = (filters: {
     condition: string; city: string; state: string;
@@ -67,15 +43,18 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="hero">
-          <div className="hero-label">Clinical Research Platform</div>
-          <h1 className="hero-title">
-            Find Trials &amp; <span className="accent">Matching Physicians</span>
-          </h1>
-          <p className="hero-sub">
-            Search thousands of active clinical trials and connect with physicians near trial locations.
-          </p>
-        </div>
+        {/* HERO SECTION - ONLY SHOW WHEN NO FILTER APPLIED */}
+        {!hasAnyFilter && (
+          <div className="hero">
+            <div className="hero-label">Clinical Research Platform</div>
+            <h1 className="hero-title">
+              Find Trials &amp; <span className="accent">Matching Physicians</span>
+            </h1>
+            <p className="hero-sub">
+              Search thousands of active clinical trials and connect with physicians near trial locations.
+            </p>
+          </div>
+        )}
 
         <div className="content-grid">
           <div className="sidebar-card">
@@ -84,21 +63,6 @@ export default function Home() {
           </div>
 
           <div>
-            {/* MAP SECTION - Shows when user has applied filters and not loading */}
-            {hasAnyFilter && !loading && !error && trialLocations.length > 0 && (
-              <div className="map-card" style={{ marginBottom: "24px" }}>
-                <h3 style={{ marginBottom: "12px", fontSize: "16px", fontWeight: "600" }}>
-                  Trial Locations & Physicians
-                </h3>
-                <MapView 
-                  center={mapCenter}
-                  trialLocations={trialLocations}
-                  physicians={physicians}
-                  radius={50}
-                />
-              </div>
-            )}
-
             {loading && (
               <div className="state-box">
                 <div className="spinner" />
