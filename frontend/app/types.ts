@@ -30,6 +30,7 @@ export interface TrialLocation {
 export interface Physician {
   npi: string;
   name: string;
+  credential: string;  // Added this field
   specialty: string;
   city: string;
   state: string;

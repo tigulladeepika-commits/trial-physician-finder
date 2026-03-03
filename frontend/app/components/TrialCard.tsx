@@ -7,7 +7,7 @@ interface TrialCardProps {
   onClick?: () => void;
 }
 
-export function TrialCard({ trial, onClick }: TrialCardProps) {
+export default function TrialCard({ trial, onClick }: TrialCardProps) {
   const getStatusColor = (status: string) => {
     if (status.includes("Recruiting")) return "bg-green-100 text-green-800";
     if (status.includes("Completed")) return "bg-gray-100 text-gray-800";

@@ -29,16 +29,11 @@ export function useTrials(
   const [totalCount, setTotalCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  
-  // Track if this is the initial load to avoid duplicate fetches
   const isInitialMount = useRef(true);
 
-  // Build location string from city and state
   const locationStr = [city, state].filter(Boolean).join(", ");
 
-  // Fetch function
   const fetch = useCallback(async () => {
-    // Skip if no condition provided
     if (!condition) {
       setTrials([]);
       setTotalCount(0);
@@ -60,7 +55,6 @@ export function useTrials(
         offset
       );
 
-      // If this is initial load, replace data. Otherwise, append for pagination.
       if (offset === 0) {
         setTrials(data);
       } else {
@@ -78,7 +72,6 @@ export function useTrials(
     }
   }, [condition, city, state, status, phase, specialty, limit, offset, locationStr]);
 
-  // Fetch on initial mount or when filters change
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -87,14 +80,12 @@ export function useTrials(
     fetch();
   }, [fetch]);
 
-  // Load more function for pagination
   const loadMore = useCallback(() => {
     if (!loading && hasMore) {
       fetch();
     }
   }, [loading, hasMore, fetch]);
 
-  // Refetch function for manual refresh
   const refetch = useCallback(() => {
     setTrials([]);
     setTotalCount(0);
