@@ -14,7 +14,7 @@ export default function Home() {
   const [status, setStatus] = useState<string | undefined>(undefined);
   const [phase, setPhase] = useState<string | undefined>(undefined);
 
-  const { trials, loading, totalCount, error, refetch, hasMore, loadMore } = useTrials(
+  const { trials, loading, totalCount, error, refetch, hasMore, loadMore, hasAnyFilter } = useTrials(
     condition, city, state, specialty, status, phase
   );
 
@@ -258,11 +258,11 @@ export default function Home() {
               </div>
             )}
 
-            {!loading && !error && !condition && (
+            {!loading && !error && !hasAnyFilter && (
               <div className="state-box">
                 <span className="state-icon">🔬</span>
                 <div className="state-title">Start your search</div>
-                <div className="state-sub">Enter a condition to discover relevant clinical trials and nearby physicians.</div>
+                <div className="state-sub">Enter any filter — condition, city, state, status or phase — to discover relevant clinical trials and nearby physicians.</div>
                 <div className="hint-pills">
                   <span className="hint-pill">Oncology</span>
                   <span className="hint-pill">Diabetes</span>
@@ -272,7 +272,7 @@ export default function Home() {
               </div>
             )}
 
-            {!loading && !error && condition && trials.length === 0 && (
+            {!loading && !error && hasAnyFilter && trials.length === 0 && (
               <div className="state-box">
                 <span className="state-icon">🔍</span>
                 <div className="state-title">No trials found</div>

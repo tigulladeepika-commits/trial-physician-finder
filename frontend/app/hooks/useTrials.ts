@@ -21,15 +21,20 @@ export function useTrials(
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
+  // Any filter being set should trigger a search
+  const hasAnyFilter = !!(condition || city || state || specialty || status || phase);
+
   const load = useCallback(
     async (pageNum: number, replace: boolean) => {
-      if (!condition) return;
+      // Require at least one filter to be set
+      if (!condition && !city && !state && !specialty && !status && !phase) return;
+
       setLoading(true);
       setError(null);
       try {
         const locationStr = [city, state].filter(Boolean).join(", ");
         const data: Trial[] = await fetchTrials(
-          condition,
+          condition || "",
           locationStr || "",
           "",
           specialty,
@@ -39,19 +44,20 @@ export function useTrials(
         setTrials(prev => replace ? fetched : [...prev, ...fetched]);
         setTotalCount(prev => replace ? fetched.length : prev + fetched.length);
         setHasMore(fetched.length === PAGE_SIZE);
-      } catch (e) {
+      } catch {
         setError("Failed to load trials. Please try again.");
       } finally {
         setLoading(false);
       }
     },
-    [condition, city, state, specialty]
+    [condition, city, state, specialty, status, phase]
   );
 
   useEffect(() => {
     setPage(1);
     setTrials([]);
     setTotalCount(0);
+    setHasMore(false);
     load(1, true);
   }, [condition, city, state, specialty, status, phase]);
 
@@ -68,5 +74,5 @@ export function useTrials(
     load(next, false);
   };
 
-  return { trials, loading, error, totalCount, hasMore, refetch, loadMore };
+  return { trials, loading, error, totalCount, hasMore, refetch, loadMore, hasAnyFilter };
 }
