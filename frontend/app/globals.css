@@ -188,3 +188,47 @@ body {
   .site-header { padding: 0 16px; }
   .sidebar-card { position: static; }
 }
+
+/* TrialCard */
+.tc { background:#fff; border:1.5px solid #e8edf5; border-radius:16px; overflow:hidden; font-family:'Inter',sans-serif; transition:border-color 0.2s,box-shadow 0.2s; }
+.tc:hover { border-color:rgba(99,102,241,0.22); box-shadow:0 4px 24px rgba(99,102,241,0.07); }
+.tc-hd { padding:18px 22px 14px; cursor:pointer; user-select:none; }
+.tc-hr { height:1px; background:#f1f5f9; }
+.tc-bd { padding:18px 22px; }
+.tc-sec { font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#6366f1; display:flex; align-items:center; gap:7px; margin-bottom:12px; }
+.tc-sec::after { content:''; flex:1; height:1px; background:linear-gradient(90deg,rgba(99,102,241,0.15),transparent); }
+.ml { font-size:10px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#94a3b8; margin-bottom:4px; }
+.mv { font-size:13px; color:#334155; }
+.loc-chip { display:inline-flex; align-items:center; gap:3px; font-size:12px; background:#f8faff; border:1px solid #dde5f5; padding:4px 10px; border-radius:7px; color:#475569; font-family:'Inter',sans-serif; }
+.crit-btn { display:flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer; font-size:12px; font-weight:500; color:#94a3b8; font-family:'Inter',sans-serif; padding:0; transition:color 0.15s; }
+.crit-btn:hover { color:#6366f1; }
+.poc-box { background:#f8faff; border:1px solid #dde5f5; border-radius:11px; padding:13px 15px; }
+.tc-actions { padding:0 22px 18px; display:flex; gap:9px; flex-wrap:wrap; }
+.btn-find { background:linear-gradient(135deg,#6366f1,#38bdf8); color:#fff; border:none; padding:9px 18px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; display:flex; align-items:center; gap:6px; transition:opacity 0.18s; box-shadow:0 2px 8px rgba(99,102,241,0.18); }
+.btn-find:hover { opacity:0.87; }
+.btn-find:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-sec { background:#fff; color:#475569; border:1.5px solid #e2e8f0; padding:9px 16px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; font-family:'Inter',sans-serif; display:flex; align-items:center; gap:6px; transition:border-color 0.18s,color 0.18s; }
+.btn-sec:hover { border-color:rgba(99,102,241,0.3); color:#6366f1; }
+.btn-sec-active { background:rgba(99,102,241,0.07); color:#6366f1; border-color:rgba(99,102,241,0.25); }
+.show-all-btn { font-size:11px; font-weight:500; color:#6366f1; background:rgba(99,102,241,0.06); border:1px solid rgba(99,102,241,0.15); padding:3px 10px; border-radius:6px; cursor:pointer; font-family:'Inter',sans-serif; transition:background 0.15s; white-space:nowrap; }
+.show-all-btn:hover { background:rgba(99,102,241,0.12); }
+.physicians-sec { padding:0 22px 22px; }
+.physicians-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; flex-wrap:wrap; gap:8px; }
+.physicians-lbl { font-size:12px; font-weight:600; color:#334155; font-family:'Inter',sans-serif; }
+.tax-sel { background:#f8faff; border:1.5px solid #dde5f5; border-radius:8px; padding:6px 26px 6px 10px; font-size:12px; color:#334155; font-family:'Inter',sans-serif; outline:none; appearance:none; -webkit-appearance:none; cursor:pointer; min-width:190px; }
+.tax-sel option { background:#fff; }
+.no-phys { text-align:center; padding:22px; background:#f8faff; border:1px solid #dde5f5; border-radius:11px; font-size:13px; color:#94a3b8; font-family:'Inter',sans-serif; }
+.nct { font-size:11px; font-family:monospace; color:#94a3b8; }
+@keyframes tc-spin { to { transform:rotate(360deg); } }
+.tc-spin { animation:tc-spin 0.85s linear infinite; display:inline-block; }
+
+/* PhysicianTrialMap */
+@keyframes geo-spin { to { transform: rotate(360deg); } }
+.geo-spin-ring {
+  width: 32px; height: 32px;
+  border: 3px solid rgba(99,102,241,0.15);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: geo-spin 0.75s linear infinite;
+}
+
