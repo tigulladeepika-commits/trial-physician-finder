@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { PhysicianFilters } from "../components/PhysicianFilters";
-import { PhysicianList } from "../components/PhysicianList";
-import TrialCard from "../components/TrialCard";
-import { Trial } from "../types";
-import { useTrials } from "../hooks/useTrials";
+import { PhysicianFilters } from "./components/PhysicianFilters";
+import { PhysicianList } from "./components/PhysicianList";
+import TrialCard from "./components/TrialCard";
+import { Trial } from "./types";
+import { useTrials } from "./hooks/useTrials";
 
 export default function Home() {
   const [condition, setCondition] = useState<string | null>(null);
