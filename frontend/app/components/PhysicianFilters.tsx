@@ -81,110 +81,92 @@ export default function PhysicianFilters({ onFilterChange }: Props) {
   };
 
   return (
-    <>
-      <style>{`
-        .f-inp::placeholder { color: #c8d3e0; font-family: 'Inter', sans-serif; }
-        .f-sel option { background: #fff; color: #1e293b; font-family: 'Inter', sans-serif; }
-        .clear-btn {
-          width: 100%; background: transparent;
-          color: #94a3b8; border: 1.5px solid #e2e8f0;
-          border-radius: 9px; padding: 9px;
-          font-size: 12px; font-weight: 500;
-          font-family: 'Inter', sans-serif; cursor: pointer;
-          margin-top: 4px; transition: color 0.18s, border-color 0.18s;
-        }
-        .clear-btn:hover { color: #6366f1; border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.03); }
-      `}</style>
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={sectionLbl}>Trial Details</div>
 
-        {/* ── Trial Details first ── */}
-        <div style={sectionLbl}>Trial Details</div>
-
-        <div>
-          <label htmlFor="f-condition" style={lbl}>Condition</label>
-          <input id="f-condition" name="condition" className="f-inp"
-            placeholder="e.g. Oncology, Diabetes..."
-            value={values.condition} style={g("condition")}
-            onFocus={() => setFocused("condition")} onBlur={() => setFocused(null)}
-            onChange={(e) => handleChange("condition", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="f-specialty" style={lbl}>Specialty</label>
-          <input id="f-specialty" name="specialty" className="f-inp"
-            placeholder="e.g. Oncology"
-            value={values.specialty} style={g("specialty")}
-            onFocus={() => setFocused("specialty")} onBlur={() => setFocused(null)}
-            onChange={(e) => handleChange("specialty", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="f-status" style={lbl}>Status</label>
-          <div style={{ position: "relative" }}>
-            <select id="f-status" name="status" className="f-sel"
-              value={values.status}
-              style={{ ...g("status"), paddingRight: "28px" }}
-              onFocus={() => setFocused("status")} onBlur={() => setFocused(null)}
-              onChange={(e) => handleChange("status", e.target.value)}
-            >
-              <option value="">All statuses</option>
-              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: "9px" }}>▼</span>
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="f-phase" style={lbl}>Phase</label>
-          <div style={{ position: "relative" }}>
-            <select id="f-phase" name="phase" className="f-sel"
-              value={values.phase}
-              style={{ ...g("phase"), paddingRight: "28px" }}
-              onFocus={() => setFocused("phase")} onBlur={() => setFocused(null)}
-              onChange={(e) => handleChange("phase", e.target.value)}
-            >
-              <option value="">All phases</option>
-              {PHASES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: "9px" }}>▼</span>
-          </div>
-        </div>
-
-        <div style={divider} />
-
-        {/* ── Location second ── */}
-        <div style={sectionLbl}>Location</div>
-
-        <div>
-          <label htmlFor="f-city" style={lbl}>City</label>
-          <input id="f-city" name="city" className="f-inp"
-            placeholder="e.g. Boston"
-            value={values.city} style={g("city")}
-            onFocus={() => setFocused("city")} onBlur={() => setFocused(null)}
-            onChange={(e) => handleChange("city", e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="f-state" style={lbl}>State</label>
-          <input id="f-state" name="state" className="f-inp"
-            placeholder="e.g. MA"
-            value={values.state} style={g("state")}
-            onFocus={() => setFocused("state")} onBlur={() => setFocused(null)}
-            onChange={(e) => handleChange("state", e.target.value)}
-          />
-        </div>
-
-        <button className="clear-btn" onClick={() => {
-          const e = { condition: "", city: "", state: "", specialty: "", status: "", phase: "" };
-          setValues(e); onFilterChange(e);
-        }}>
-          Clear all filters
-        </button>
+      <div>
+        <label htmlFor="f-condition" style={lbl}>Condition</label>
+        <input id="f-condition" name="condition" className="f-inp"
+          placeholder="e.g. Oncology, Diabetes..."
+          value={values.condition} style={g("condition")}
+          onFocus={() => setFocused("condition")} onBlur={() => setFocused(null)}
+          onChange={(e) => handleChange("condition", e.target.value)}
+        />
       </div>
-    </>
+
+      <div>
+        <label htmlFor="f-specialty" style={lbl}>Specialty</label>
+        <input id="f-specialty" name="specialty" className="f-inp"
+          placeholder="e.g. Oncology"
+          value={values.specialty} style={g("specialty")}
+          onFocus={() => setFocused("specialty")} onBlur={() => setFocused(null)}
+          onChange={(e) => handleChange("specialty", e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="f-status" style={lbl}>Status</label>
+        <div style={{ position: "relative" }}>
+          <select id="f-status" name="status" className="f-sel"
+            value={values.status}
+            style={{ ...g("status"), paddingRight: "28px" }}
+            onFocus={() => setFocused("status")} onBlur={() => setFocused(null)}
+            onChange={(e) => handleChange("status", e.target.value)}
+          >
+            <option value="">All statuses</option>
+            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: "9px" }}>▼</span>
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="f-phase" style={lbl}>Phase</label>
+        <div style={{ position: "relative" }}>
+          <select id="f-phase" name="phase" className="f-sel"
+            value={values.phase}
+            style={{ ...g("phase"), paddingRight: "28px" }}
+            onFocus={() => setFocused("phase")} onBlur={() => setFocused(null)}
+            onChange={(e) => handleChange("phase", e.target.value)}
+          >
+            <option value="">All phases</option>
+            {PHASES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <span style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: "9px" }}>▼</span>
+        </div>
+      </div>
+
+      <div style={divider} />
+
+      <div style={sectionLbl}>Location</div>
+
+      <div>
+        <label htmlFor="f-city" style={lbl}>City</label>
+        <input id="f-city" name="city" className="f-inp"
+          placeholder="e.g. Boston"
+          value={values.city} style={g("city")}
+          onFocus={() => setFocused("city")} onBlur={() => setFocused(null)}
+          onChange={(e) => handleChange("city", e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="f-state" style={lbl}>State</label>
+        <input id="f-state" name="state" className="f-inp"
+          placeholder="e.g. MA"
+          value={values.state} style={g("state")}
+          onFocus={() => setFocused("state")} onBlur={() => setFocused(null)}
+          onChange={(e) => handleChange("state", e.target.value)}
+        />
+      </div>
+
+      <button className="clear-btn" onClick={() => {
+        const e = { condition: "", city: "", state: "", specialty: "", status: "", phase: "" };
+        setValues(e); onFilterChange(e);
+      }}>
+        Clear all filters
+      </button>
+    </div>
   );
 }
