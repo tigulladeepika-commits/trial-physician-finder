@@ -21,29 +21,43 @@ export function useTrials(
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  // Any filter being set should trigger a search
   const hasAnyFilter = !!(condition || city || state || specialty || status || phase);
 
   const load = useCallback(
     async (pageNum: number, replace: boolean) => {
-      // Require at least one filter to be set
       if (!condition && !city && !state && !specialty && !status && !phase) return;
 
       setLoading(true);
       setError(null);
       try {
-        const locationStr = [city, state].filter(Boolean).join(", ");
-        const data: Trial[] = await fetchTrials(
+        const offset = (pageNum - 1) * PAGE_SIZE;
+
+        // FIX 1: city and state were being joined into a single string and passed
+        // as the city param, with an empty string for state.
+        // e.g. fetchTrials(cond, "boston, MA", "", ...) — state filter never worked.
+        // Now city and state are passed as separate params as the API expects.
+        //
+        // FIX 2: status and phase were accepted by this hook but NEVER forwarded
+        // to fetchTrials, so the backend never received them. Now passed correctly.
+        const result = await fetchTrials(
           condition || "",
-          locationStr || "",
-          "",
-          specialty,
-          PAGE_SIZE
+          city    || "",
+          state   || "",
+          specialty || undefined,
+          PAGE_SIZE,
+          status    || undefined,
+          phase     || undefined,
+          offset    || undefined
         );
-        const fetched = data ?? [];
+
+        const fetched: Trial[] = result.trials ?? [];
+        const total: number    = result.total   ?? fetched.length;
+
         setTrials(prev => replace ? fetched : [...prev, ...fetched]);
-        setTotalCount(prev => replace ? fetched.length : prev + fetched.length);
-        setHasMore(fetched.length === PAGE_SIZE);
+        setTotalCount(total);
+        // FIX 3: hasMore was based on fetched.length === PAGE_SIZE which breaks
+        // when the last page happens to be exactly PAGE_SIZE. Use total count instead.
+        setHasMore((pageNum * PAGE_SIZE) < total);
       } catch {
         setError("Failed to load trials. Please try again.");
       } finally {

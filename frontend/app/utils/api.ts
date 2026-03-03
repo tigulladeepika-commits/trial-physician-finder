@@ -12,11 +12,29 @@ export async function fetchTrials(
   city: string,
   state: string,
   specialty?: string,
-  limit?: number
+  limit?: number,
+  // FIX: Added status, phase, offset — previously missing entirely.
+  // useTrials was passing them to this function's call site but this
+  // function never added them to the URL, so the backend never saw them.
+  status?: string,
+  phase?: string,
+  offset?: number
 ) {
-  const params = new URLSearchParams({ condition, city, state });
+  const params = new URLSearchParams({ condition });
+
+  // FIX: city and state sent as separate params, not joined.
+  // useTrials was doing: fetchTrials(condition, "boston, MA", "", ...)
+  // which sent city="boston, MA" and state="" — backend location filter broken.
+  if (city)  params.append("city",  city);
+  if (state) params.append("state", state);
+
   if (specialty) params.append("specialty", specialty);
-  if (limit) params.append("limit", String(limit));
+  if (limit)     params.append("limit",     String(limit));
+  if (offset)    params.append("offset",    String(offset));
+
+  // FIX: status and phase now actually sent to the backend
+  if (status && status !== "all" && status !== "") params.append("status", status);
+  if (phase  && phase  !== "all" && phase  !== "") params.append("phase",  phase);
 
   const res = await fetch(`${baseUrl}/api/trials/?${params}`);
   if (!res.ok) {
@@ -24,7 +42,8 @@ export async function fetchTrials(
     throw new Error(`Failed to fetch trials: ${res.status}`);
   }
   const data = await res.json();
-  return data.trials ?? [];
+  // Return both trials and totalCount so useTrials can paginate correctly
+  return { trials: data.trials ?? [], total: data.pagination?.total ?? 0 };
 }
 
 /**
@@ -38,8 +57,8 @@ export async function fetchPhysicians(
   condition?: string
 ) {
   const params = new URLSearchParams();
-  if (city) params.append("city", city);
-  if (state) params.append("state", state);
+  if (city)      params.append("city",      city);
+  if (state)     params.append("state",     state);
   if (condition) params.append("condition", condition);
 
   const res = await fetch(`${baseUrl}/api/physicians/?${params}`);
