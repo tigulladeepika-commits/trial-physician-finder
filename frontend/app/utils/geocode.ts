@@ -1,29 +1,33 @@
 /**
- * geocode.ts
- * All geocoding in this app goes through Geoapify ONLY.
- * MapQuest is never used for geocoding — only for map tile display.
+ * PLACE THIS FILE AT: frontend/app/utils/geocode.ts
+ *
+ * All geocoding in this app uses Geoapify ONLY.
+ * MapQuest is NEVER called for geocoding — only for map tiles and marker icons.
  */
 
 const GEO_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_KEY ?? "";
 
-// Simple in-memory cache so we don't re-geocode the same city/state
-const cache = new Map<string, [number, number] | null>();
+// In-memory cache — avoids re-geocoding the same city/state within a session
+const geoCache = new Map<string, [number, number] | null>();
 
 /**
- * Geocode a city + state (US) using Geoapify.
- * Returns [lat, lon] or null if not found / key missing.
+ * Geocode a US city + state string using Geoapify.
+ * Returns [lat, lon] or null if not found.
  */
 export async function geocodeCity(
   city: string,
   state: string
 ): Promise<[number, number] | null> {
   if (!GEO_KEY) {
-    console.warn("[geocode] NEXT_PUBLIC_GEOAPIFY_KEY is not set.");
+    console.warn(
+      "[geocode] NEXT_PUBLIC_GEOAPIFY_KEY is not set. " +
+      "Add it to .env.local and Vercel environment variables."
+    );
     return null;
   }
 
-  const key = (city + "," + state).toLowerCase().trim();
-  if (cache.has(key)) return cache.get(key)!;
+  const cacheKey = (city + "|" + state).toLowerCase().trim();
+  if (geoCache.has(cacheKey)) return geoCache.get(cacheKey)!;
 
   try {
     const query = encodeURIComponent(city + ", " + state + ", USA");
@@ -35,78 +39,38 @@ export async function geocodeCity(
       "&apiKey=" + GEO_KEY;
 
     const res = await fetch(url);
+
     if (!res.ok) {
-      console.error("[geocode] Geoapify HTTP error:", res.status);
-      cache.set(key, null);
+      console.error("[geocode] Geoapify responded with HTTP", res.status);
+      geoCache.set(cacheKey, null);
       return null;
     }
 
     const data = await res.json();
     const feature = data?.features?.[0];
+
     if (!feature) {
-      cache.set(key, null);
+      console.warn("[geocode] No result for:", city, state);
+      geoCache.set(cacheKey, null);
       return null;
     }
 
+    // Geoapify returns [longitude, latitude] — swap to [lat, lon]
     const [lon, lat] = feature.geometry.coordinates as [number, number];
     const result: [number, number] = [lat, lon];
-    cache.set(key, result);
+    geoCache.set(cacheKey, result);
     return result;
   } catch (err) {
-    console.error("[geocode] Geoapify request failed:", err);
-    cache.set(key, null);
+    console.error("[geocode] Geoapify fetch failed:", err);
+    geoCache.set(cacheKey, null);
     return null;
   }
 }
 
 /**
- * Geocode a full address string using Geoapify.
- * Useful when you have street-level detail.
+ * Haversine formula — straight-line distance between two lat/lon points in km.
+ * Used for radius filtering on the map.
  */
-export async function geocodeAddress(
-  address: string
-): Promise<[number, number] | null> {
-  if (!GEO_KEY) {
-    console.warn("[geocode] NEXT_PUBLIC_GEOAPIFY_KEY is not set.");
-    return null;
-  }
-
-  const key = address.toLowerCase().trim();
-  if (cache.has(key)) return cache.get(key)!;
-
-  try {
-    const query = encodeURIComponent(address);
-    const url =
-      "https://api.geoapify.com/v1/geocode/search" +
-      "?text=" + query +
-      "&limit=1" +
-      "&apiKey=" + GEO_KEY;
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      cache.set(key, null);
-      return null;
-    }
-
-    const data = await res.json();
-    const feature = data?.features?.[0];
-    if (!feature) {
-      cache.set(key, null);
-      return null;
-    }
-
-    const [lon, lat] = feature.geometry.coordinates as [number, number];
-    const result: [number, number] = [lat, lon];
-    cache.set(key, result);
-    return result;
-  } catch (err) {
-    console.error("[geocode] Geoapify address request failed:", err);
-    cache.set(key, null);
-    return null;
-  }
-}
-
-/** Haversine distance between two lat/lon points in km */
 export function haversineKm(
   lat1: number,
   lon1: number,
