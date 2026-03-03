@@ -9,7 +9,7 @@ type Props = {
   searchedState?: string;
 };
 
-const MQ_KEY = "Ykpe3tfSmVqKRYujfcgRw8ddU79yLJ5j";
+const MQ_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY ?? "";
 
 declare global {
   interface Window { L: any; MQ: any; }

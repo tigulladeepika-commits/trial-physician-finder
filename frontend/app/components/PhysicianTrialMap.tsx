@@ -306,60 +306,67 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         </div>
       </div>
 
-      {/* ── Loading / geocoding overlay ── */}
-      {(mapStatus === "loading" || mapStatus === "geocoding") && (
-        <div style={{
-          height: "420px",
-          background: "#f8faff",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "10px",
-        }}>
-          <style>{`@keyframes geo-spin { to { transform: rotate(360deg); } }`}</style>
+      {/* ── Wrapper keeps both overlay and map stacked ── */}
+      <div style={{ position: "relative", height: "420px" }}>
+
+        {/* ── Loading / geocoding overlay ── */}
+        {(mapStatus === "loading" || mapStatus === "geocoding") && (
           <div style={{
-            width: 32, height: 32,
-            border: "3px solid rgba(99,102,241,0.15)",
-            borderTopColor: "#6366f1",
-            borderRadius: "50%",
-            animation: "geo-spin 0.75s linear infinite",
-          }} />
-          <span style={{ fontSize: "13px", color: "#94a3b8" }}>
-            {mapStatus === "geocoding"
-              ? "Locating trial sites via Geoapify..."
-              : "Loading map..."}
-          </span>
-        </div>
-      )}
+            position: "absolute", inset: 0,
+            background: "#f8faff",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "10px",
+            zIndex: 10,
+          }}>
+            <style>{`@keyframes geo-spin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{
+              width: 32, height: 32,
+              border: "3px solid rgba(99,102,241,0.15)",
+              borderTopColor: "#6366f1",
+              borderRadius: "50%",
+              animation: "geo-spin 0.75s linear infinite",
+            }} />
+            <span style={{ fontSize: "13px", color: "#94a3b8" }}>
+              {mapStatus === "geocoding"
+                ? "Locating trial sites via Geoapify..."
+                : "Loading map..."}
+            </span>
+          </div>
+        )}
 
-      {/* ── Error overlay ── */}
-      {mapStatus === "error" && (
-        <div style={{
-          height: "200px",
-          background: "#fef2f2",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "8px",
-        }}>
-          <span style={{ fontSize: "18px" }}>⚠️</span>
-          <span style={{ fontSize: "13px", color: "#dc2626", textAlign: "center", padding: "0 24px" }}>
-            Map failed to load. Verify NEXT_PUBLIC_MAPQUEST_KEY and NEXT_PUBLIC_GEOAPIFY_KEY in your environment variables.
-          </span>
-        </div>
-      )}
+        {/* ── Error overlay ── */}
+        {mapStatus === "error" && (
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "#fef2f2",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            zIndex: 10,
+          }}>
+            <span style={{ fontSize: "18px" }}>⚠️</span>
+            <span style={{ fontSize: "13px", color: "#dc2626", textAlign: "center", padding: "0 24px" }}>
+              Map failed to load. Verify NEXT_PUBLIC_MAPQUEST_KEY and NEXT_PUBLIC_GEOAPIFY_KEY in your environment variables.
+            </span>
+          </div>
+        )}
 
-      {/* ── Map container ── always in DOM so ref stays valid ── */}
-      <div
-        ref={containerRef}
-        style={{
-          height: "420px",
-          width: "100%",
-          display: mapStatus === "ready" ? "block" : "none",
-        }}
-      />
+        {/* ── Map container — always in DOM with real dimensions so Leaflet can render ── */}
+        <div
+          ref={containerRef}
+          style={{
+            height: "420px",
+            width: "100%",
+            // Use visibility instead of display:none — keeps dimensions intact for Leaflet
+            visibility: mapStatus === "ready" ? "visible" : "hidden",
+          }}
+        />
+      </div>
     </div>
   );
 }
