@@ -1,4 +1,3 @@
-// app/layout.tsx
 import "./globals.css";
 
 export const metadata = {
@@ -11,6 +10,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        
+        {/* Leaflet CSS - Required for map styling */}
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        
         {/* Inter — used by page.tsx, TrialCard.tsx, PhysicianCard.tsx, PhysicianFilters.tsx */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
