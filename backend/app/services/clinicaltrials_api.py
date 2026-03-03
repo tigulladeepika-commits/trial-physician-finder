@@ -26,7 +26,6 @@ STATE_MAP = {
 }
 
 CONDITION_SYNONYMS = {
-    # ── Oncology / Cancer ──────────────────────────────────────────────
     "oncology": "cancer OR tumor OR carcinoma OR malignancy OR neoplasm OR sarcoma OR lymphoma OR leukemia OR melanoma OR myeloma OR glioma OR blastoma",
     "cancer": "cancer OR tumor OR carcinoma OR malignancy OR neoplasm OR sarcoma OR lymphoma OR leukemia OR melanoma OR myeloma OR glioma OR blastoma",
     "breast cancer": "breast cancer OR breast neoplasm OR breast carcinoma OR breast tumor OR HER2 OR triple negative breast",
@@ -45,7 +44,6 @@ CONDITION_SYNONYMS = {
     "bladder cancer": "bladder cancer OR urothelial carcinoma OR bladder neoplasm",
     "thyroid cancer": "thyroid cancer OR thyroid carcinoma OR papillary thyroid OR follicular thyroid",
     "stomach cancer": "stomach cancer OR gastric cancer OR gastric carcinoma OR gastroesophageal",
-    # ── Cardiovascular ─────────────────────────────────────────────────
     "cardiology": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial OR heart disease",
     "heart disease": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial",
     "heart failure": "heart failure OR cardiac failure OR congestive heart failure OR cardiomyopathy",
@@ -53,13 +51,11 @@ CONDITION_SYNONYMS = {
     "hypertension": "hypertension OR high blood pressure OR arterial hypertension",
     "atrial fibrillation": "atrial fibrillation OR AFib OR atrial flutter OR cardiac arrhythmia",
     "stroke": "stroke OR cerebrovascular OR ischemic stroke OR hemorrhagic stroke OR TIA OR transient ischemic",
-    # ── Metabolic / Endocrine ───────────────────────────────────────────
     "diabetes": "diabetes mellitus OR diabetic OR hyperglycemia OR insulin resistance OR type 2 diabetes OR type 1 diabetes",
     "type 1 diabetes": "type 1 diabetes OR T1D OR juvenile diabetes OR insulin dependent diabetes",
     "type 2 diabetes": "type 2 diabetes OR T2D OR adult onset diabetes OR non-insulin dependent diabetes",
     "obesity": "obesity OR overweight OR bariatric OR adiposity OR metabolic syndrome OR weight loss",
     "thyroid disease": "thyroid OR hypothyroidism OR hyperthyroidism OR Hashimoto OR Graves disease",
-    # ── Neurological ───────────────────────────────────────────────────
     "alzheimer": "Alzheimer OR dementia OR cognitive decline OR memory loss OR neurodegenerative",
     "alzheimers": "Alzheimer OR dementia OR cognitive decline OR memory loss OR neurodegenerative",
     "parkinson": "Parkinson OR parkinsonism OR Lewy body OR dopaminergic",
@@ -68,7 +64,6 @@ CONDITION_SYNONYMS = {
     "epilepsy": "epilepsy OR seizure OR convulsion OR anticonvulsant",
     "migraine": "migraine OR headache OR cluster headache",
     "als": "ALS OR amyotrophic lateral sclerosis OR motor neuron disease OR Lou Gehrig",
-    # ── Mental Health ──────────────────────────────────────────────────
     "mental health": "depression OR anxiety OR bipolar OR schizophrenia OR PTSD OR psychiatric OR psychological",
     "depression": "depression OR major depressive disorder OR MDD OR depressive episode",
     "anxiety": "anxiety OR generalized anxiety disorder OR GAD OR panic disorder OR social anxiety",
@@ -77,28 +72,22 @@ CONDITION_SYNONYMS = {
     "ptsd": "PTSD OR post-traumatic stress OR trauma OR post traumatic",
     "adhd": "ADHD OR attention deficit OR hyperactivity disorder OR ADD",
     "autism": "autism OR ASD OR autism spectrum disorder OR Asperger",
-    # ── Respiratory ────────────────────────────────────────────────────
     "asthma": "asthma OR bronchial asthma OR reactive airway disease",
     "copd": "COPD OR chronic obstructive pulmonary OR emphysema OR chronic bronchitis",
     "covid": "COVID OR SARS-CoV-2 OR coronavirus OR post-COVID OR long COVID",
     "pneumonia": "pneumonia OR respiratory infection OR lung infection",
-    # ── Autoimmune / Inflammatory ──────────────────────────────────────
     "arthritis": "arthritis OR rheumatoid arthritis OR osteoarthritis OR joint inflammation",
     "rheumatoid arthritis": "rheumatoid arthritis OR RA OR rheumatoid OR synovitis",
     "lupus": "lupus OR SLE OR systemic lupus erythematosus OR autoimmune",
     "crohn": "Crohn OR inflammatory bowel disease OR IBD OR Crohn's disease",
     "ulcerative colitis": "ulcerative colitis OR IBD OR inflammatory bowel OR colitis",
     "psoriasis": "psoriasis OR psoriatic arthritis OR plaque psoriasis",
-    # ── Infectious Disease ─────────────────────────────────────────────
     "hiv": "HIV OR AIDS OR antiretroviral OR human immunodeficiency virus",
     "hepatitis": "hepatitis OR hepatitis B OR hepatitis C OR HBV OR HCV OR liver inflammation",
     "tuberculosis": "tuberculosis OR TB OR mycobacterium tuberculosis",
-    # ── Kidney / Renal ─────────────────────────────────────────────────
     "kidney disease": "kidney disease OR renal disease OR chronic kidney disease OR CKD OR renal failure OR nephropathy",
-    # ── Women's Health ─────────────────────────────────────────────────
     "endometriosis": "endometriosis OR endometrial OR uterine",
     "menopause": "menopause OR menopausal OR postmenopausal OR hormone replacement",
-    # ── Pain ───────────────────────────────────────────────────────────
     "chronic pain": "chronic pain OR neuropathic pain OR fibromyalgia OR pain management",
     "fibromyalgia": "fibromyalgia OR chronic widespread pain OR fibromyalgia syndrome",
 }
@@ -107,18 +96,15 @@ CONDITION_SYNONYMS = {
 def _expand_condition(condition: str) -> str:
     if not condition or not condition.strip():
         return condition
-    lower = condition.lower().strip()
-    return CONDITION_SYNONYMS.get(lower, condition)
+    return CONDITION_SYNONYMS.get(condition.lower().strip(), condition)
 
 
 def _expand_location(location: str) -> str | None:
     if not location or not location.strip():
         return None
     parts = [p.strip() for p in location.split(",")]
-    expanded_parts = []
-    for part in parts:
-        expanded_parts.append(STATE_MAP.get(part.upper(), part))
-    result = ", ".join(expanded_parts)
+    expanded = [STATE_MAP.get(p.upper(), p) for p in parts]
+    result = ", ".join(expanded)
     if "united states" not in result.lower():
         result = f"{result}, United States"
     return result
@@ -139,19 +125,15 @@ def fetch_trials(
         "countTotal": "true",
         "format": "json",
     }
-
     if location_query:
         params["query.locn"] = location_query
-
     if offset > 0:
         page_token = _get_page_token(params, offset)
         if page_token:
             params["pageToken"] = page_token
 
     try:
-        response = requests.get(
-            CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15
-        )
+        response = requests.get(CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15)
         response.raise_for_status()
         data = response.json()
     except requests.HTTPError as e:
@@ -163,36 +145,13 @@ def fetch_trials(
 
     studies = data.get("studies", [])
     total_count = data.get("totalCount", len(studies))
-
-    logger.info(
-        f"ClinicalTrials returned {len(studies)} studies (total={total_count}) "
-        f"| condition={condition_query} | location={location_query}"
-    )
-
-    search_keywords = _get_filter_keywords(condition)
-    filtered_studies = []
-    for study in studies:
-        protocol = study.get("protocolSection", {})
-        study_conditions = [
-            c.lower()
-            for c in protocol.get("conditionsModule", {}).get("conditions", [])
-        ]
-        if search_keywords and not any(
-            kw in cond
-            for kw in search_keywords
-            for cond in study_conditions
-        ):
-            logger.debug(f"Filtered out study with conditions: {study_conditions}")
-            continue
-        filtered_studies.append(study)
-
-    logger.info(f"After post-filter: {len(filtered_studies)} studies remain")
+    logger.info(f"ClinicalTrials returned {len(studies)} studies (total={total_count})")
 
     results = []
-    for study in filtered_studies:
+    for study in studies:
         protocol = study.get("protocolSection", {})
-
         locations_module = protocol.get("contactsLocationsModule", {})
+
         locations = [
             {
                 "facility": loc.get("facility"),
@@ -217,17 +176,13 @@ def fetch_trials(
                 "email": c.get("email"),
             }
 
-        eligibility = protocol.get("eligibilityModule", {})
-        criteria_text = eligibility.get("eligibilityCriteria", "")
+        criteria_text = protocol.get("eligibilityModule", {}).get("eligibilityCriteria", "")
         inclusion_criteria = ""
         exclusion_criteria = ""
         if "Inclusion Criteria:" in criteria_text:
             parts = criteria_text.split("Exclusion Criteria:")
             inclusion_criteria = parts[0].replace("Inclusion Criteria:", "").strip()
             exclusion_criteria = parts[1].strip() if len(parts) > 1 else ""
-
-        design_module = protocol.get("designModule", {})
-        phases = design_module.get("phases", [])
 
         results.append({
             "nctId": protocol.get("identificationModule", {}).get("nctId"),
@@ -236,7 +191,7 @@ def fetch_trials(
             "description": protocol.get("descriptionModule", {}).get("briefSummary"),
             "conditions": protocol.get("conditionsModule", {}).get("conditions", []),
             "sponsor": protocol.get("sponsorCollaboratorsModule", {}).get("leadSponsor", {}).get("name"),
-            "phases": phases,
+            "phases": protocol.get("designModule", {}).get("phases", []),
             "locations": locations,
             "inclusionCriteria": inclusion_criteria,
             "exclusionCriteria": exclusion_criteria,
@@ -251,71 +206,52 @@ def fetch_trials_with_filters(
     limit: int = 10,
     offset: int = 0,
 ) -> tuple[list, int]:
-    location_str = ""
-    if filters.get('city') or filters.get('state'):
-        location_str = ", ".join(filter(None, [filters.get('city'), filters.get('state')]))
+    location_str = ", ".join(filter(None, [filters.get("city"), filters.get("state")]))
+    condition_str = filters.get("condition", "")
 
-    condition_str = filters.get('condition', '')
-
-    api_results, api_total = fetch_trials(
+    api_results, _ = fetch_trials(
         condition=condition_str,
         location=location_str,
         limit=limit * 3,
-        offset=offset
+        offset=offset,
     )
 
-    filtered_results = []
-
+    filtered = []
     for trial in api_results:
-        if filters.get('condition'):
-            trial_conditions = [c.lower() for c in trial.get('conditions', [])]
-            condition_match = any(
-                filters['condition'].lower() in cond
-                for cond in trial_conditions
-            )
-            if not condition_match:
+        if filters.get("condition"):
+            trial_conds = [c.lower() for c in trial.get("conditions", [])]
+            if not any(filters["condition"].lower() in c for c in trial_conds):
                 continue
 
-        if filters.get('status'):
-            trial_status = trial.get('status', '').upper()
-            if filters['status'].upper() not in trial_status:
+        if filters.get("status"):
+            if filters["status"].upper() not in trial.get("status", "").upper():
                 continue
 
-        if filters.get('phase'):
-            trial_phases = [p.upper() for p in trial.get('phases', [])]
-            if not any(filters['phase'].upper() in phase for phase in trial_phases):
+        if filters.get("phase"):
+            phases = [p.upper() for p in trial.get("phases", [])]
+            if not any(filters["phase"].upper() in p for p in phases):
                 continue
 
-        if filters.get('city') or filters.get('state'):
-            locations = trial.get('locations', [])
-            location_match = False
-            for location in locations:
-                loc_city = location.get('city', '').lower()
-                loc_state = location.get('state', '').lower()
-                city_ok = not filters.get('city') or filters['city'].lower() in loc_city
-                state_ok = not filters.get('state') or filters['state'].lower() in loc_state
+        if filters.get("city") or filters.get("state"):
+            match = False
+            for loc in trial.get("locations", []):
+                city_ok  = not filters.get("city")  or filters["city"].lower()  in (loc.get("city",  "") or "").lower()
+                state_ok = not filters.get("state") or filters["state"].lower() in (loc.get("state", "") or "").lower()
                 if city_ok and state_ok:
-                    location_match = True
+                    match = True
                     break
-            if not location_match:
+            if not match:
                 continue
 
-        filtered_results.append(trial)
-
-        if len(filtered_results) >= limit:
+        filtered.append(trial)
+        if len(filtered) >= limit:
             break
 
-    logger.info(
-        f"Filtered {len(api_results)} trials down to {len(filtered_results)} "
-        f"with filters: {filters}"
-    )
-
-    return filtered_results, len(filtered_results)
+    logger.info(f"fetch_trials_with_filters: {len(filtered)} results for filters={filters}")
+    return filtered, len(filtered)
 
 
-# FIX: trials.py imports `fetch_trials_accurate` but the function above is
-# named `fetch_trials_with_filters`. This alias makes both names work so
-# nothing else in the codebase breaks.
+# Alias so both trials.py import names work
 fetch_trials_accurate = fetch_trials_with_filters
 
 
@@ -326,11 +262,9 @@ def _get_filter_keywords(condition: str) -> list[str]:
 def _get_page_token(base_params: dict, offset: int) -> str | None:
     params = {**base_params, "pageSize": offset}
     try:
-        response = requests.get(
-            CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15
-        )
-        response.raise_for_status()
-        return response.json().get("nextPageToken")
+        r = requests.get(CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        return r.json().get("nextPageToken")
     except Exception as e:
-        logger.warning(f"Could not retrieve page token for offset {offset}: {e}")
+        logger.warning(f"Could not retrieve page token: {e}")
         return None

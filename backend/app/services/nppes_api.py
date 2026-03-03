@@ -50,52 +50,52 @@ NON_PHYSICIAN_TAXONOMY_CODES = {
 }
 
 CONDITION_TO_TAXONOMY_CODES = {
-    "breast cancer":  ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X", "207VG0400X"],
-    "cancer":         ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
-    "tumor":          ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
-    "lymphoma":       ["207RH0003X", "207RH0000X", "207RX0202X"],
-    "leukemia":       ["207RH0003X", "207RH0000X", "207RX0202X"],
-    "melanoma":       ["207RH0003X", "207RX0202X", "207N00000X"],
-    "carcinoma":      ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
-    "neoplasm":       ["207RH0003X", "207RX0202X"],
-    "prostate":       ["207RH0003X", "207RX0202X", "208800000X", "2085R0001X"],
-    "colorectal":     ["207RH0003X", "207RX0202X", "208C00000X", "207RG0100X"],
-    "lung cancer":    ["207RH0003X", "207RX0202X", "207RP1001X", "208G00000X"],
-    "sarcoma":        ["207RH0003X", "207RX0202X", "207X00000X"],
-    "myeloma":        ["207RH0003X", "207RH0000X", "207RX0202X"],
-    "renal":          ["207RH0003X", "207RX0202X", "207RN0300X", "208800000X"],
-    "kidney":         ["207RN0300X", "208800000X", "207RH0003X"],
-    "heart":          ["207RC0000X", "207RC0001X"],
-    "cardiac":        ["207RC0000X", "207RC0001X"],
-    "cardiovascular": ["207RC0000X"],
-    "hypertension":   ["207RC0000X", "207R00000X", "207RN0300X"],
-    "arrhythmia":     ["207RC0001X", "207RC0000X"],
-    "stroke":         ["2084N0400X", "2084V0102X", "207RC0000X"],
-    "coronary":       ["207RC0000X"],
-    "diabetes":       ["207RE0101X", "207R00000X"],
-    "thyroid":        ["207RE0101X"],
-    "obesity":        ["207RE0101X", "207R00000X"],
-    "alzheimer":      ["2084N0400X", "207QG0300X"],
-    "parkinson":      ["2084N0400X"],
-    "epilepsy":       ["2084N0400X", "2084E0001X"],
-    "migraine":       ["2084N0400X", "2084H0002X"],
+    "breast cancer":      ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X", "207VG0400X"],
+    "cancer":             ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
+    "tumor":              ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
+    "lymphoma":           ["207RH0003X", "207RH0000X", "207RX0202X"],
+    "leukemia":           ["207RH0003X", "207RH0000X", "207RX0202X"],
+    "melanoma":           ["207RH0003X", "207RX0202X", "207N00000X"],
+    "carcinoma":          ["207RH0003X", "207RX0202X", "2085R0001X", "2086S0102X"],
+    "neoplasm":           ["207RH0003X", "207RX0202X"],
+    "prostate":           ["207RH0003X", "207RX0202X", "208800000X", "2085R0001X"],
+    "colorectal":         ["207RH0003X", "207RX0202X", "208C00000X", "207RG0100X"],
+    "lung cancer":        ["207RH0003X", "207RX0202X", "207RP1001X", "208G00000X"],
+    "sarcoma":            ["207RH0003X", "207RX0202X", "207X00000X"],
+    "myeloma":            ["207RH0003X", "207RH0000X", "207RX0202X"],
+    "renal":              ["207RH0003X", "207RX0202X", "207RN0300X", "208800000X"],
+    "kidney":             ["207RN0300X", "208800000X", "207RH0003X"],
+    "heart":              ["207RC0000X", "207RC0001X"],
+    "cardiac":            ["207RC0000X", "207RC0001X"],
+    "cardiovascular":     ["207RC0000X"],
+    "hypertension":       ["207RC0000X", "207R00000X", "207RN0300X"],
+    "arrhythmia":         ["207RC0001X", "207RC0000X"],
+    "stroke":             ["2084N0400X", "2084V0102X", "207RC0000X"],
+    "coronary":           ["207RC0000X"],
+    "diabetes":           ["207RE0101X", "207R00000X"],
+    "thyroid":            ["207RE0101X"],
+    "obesity":            ["207RE0101X", "207R00000X"],
+    "alzheimer":          ["2084N0400X", "207QG0300X"],
+    "parkinson":          ["2084N0400X"],
+    "epilepsy":           ["2084N0400X", "2084E0001X"],
+    "migraine":           ["2084N0400X", "2084H0002X"],
     "multiple sclerosis": ["2084N0400X"],
-    "asthma":         ["207RP1001X", "207K00000X"],
-    "copd":           ["207RP1001X", "207R00000X"],
-    "crohn":          ["207RG0100X", "207R00000X"],
-    "colitis":        ["207RG0100X", "207R00000X"],
-    "hepatitis":      ["207RG0100X", "207RI0008X"],
-    "arthritis":      ["207RR0500X", "207R00000X"],
-    "lupus":          ["207RR0500X"],
-    "rheumatoid":     ["207RR0500X"],
-    "depression":     ["2084P0800X", "2084P0804X"],
-    "anxiety":        ["2084P0800X", "2084P0804X"],
-    "schizophrenia":  ["2084P0800X"],
-    "bipolar":        ["2084P0800X"],
-    "ptsd":           ["2084P0800X"],
-    "adhd":           ["2084P0800X", "2084P0804X", "208000000X"],
-    "hiv":            ["207RI0200X", "207R00000X"],
-    "bladder":        ["208800000X"],
+    "asthma":             ["207RP1001X", "207K00000X"],
+    "copd":               ["207RP1001X", "207R00000X"],
+    "crohn":              ["207RG0100X", "207R00000X"],
+    "colitis":            ["207RG0100X", "207R00000X"],
+    "hepatitis":          ["207RG0100X", "207RI0008X"],
+    "arthritis":          ["207RR0500X", "207R00000X"],
+    "lupus":              ["207RR0500X"],
+    "rheumatoid":         ["207RR0500X"],
+    "depression":         ["2084P0800X", "2084P0804X"],
+    "anxiety":            ["2084P0800X", "2084P0804X"],
+    "schizophrenia":      ["2084P0800X"],
+    "bipolar":            ["2084P0800X"],
+    "ptsd":               ["2084P0800X"],
+    "adhd":               ["2084P0800X", "2084P0804X", "208000000X"],
+    "hiv":                ["207RI0200X", "207R00000X"],
+    "bladder":            ["208800000X"],
 }
 
 STATE_ABBR = {
@@ -234,8 +234,6 @@ def normalize_state(state: str) -> str | None:
     if not state:
         return None
     s = state.strip()
-    if not s:
-        return None
     if len(s) == 2:
         return s.upper()
     return STATE_ABBR.get(s.lower(), s.upper())
@@ -281,7 +279,7 @@ async def _query_nppes(
         return []
 
     raw = data.get("results", [])
-    logger.info(f"NPPES returned {len(raw)} raw results (city={city}, state={state}, taxonomy={taxonomy_description})")
+    logger.info(f"NPPES returned {len(raw)} results (city={city}, state={state}, taxonomy={taxonomy_description})")
     return raw
 
 
@@ -315,7 +313,6 @@ def _parse_physician(item: dict, expected_city: str | None = None) -> dict | Non
         or "Unknown"
     )
 
-    credential = (basic.get("credential") or "").strip()
     full_address = (
         f"{practice_address.get('address_1', '')}, "
         f"{practice_address.get('city', '')}, "
@@ -326,7 +323,7 @@ def _parse_physician(item: dict, expected_city: str | None = None) -> dict | Non
     return {
         "npi": item.get("number"),
         "name": f"{basic.get('first_name', '')} {basic.get('last_name', '')}".strip(),
-        "credential": credential,
+        "credential": (basic.get("credential") or "").strip(),
         "city": practice_address.get("city"),
         "state": practice_address.get("state"),
         "address": practice_address.get("address_1"),
@@ -347,10 +344,7 @@ async def fetch_physicians_near(
     state_code = normalize_state(state) if state else None
     taxonomy_codes = get_taxonomy_codes_for_condition(condition) if condition else []
 
-    logger.info(
-        f"Fetching physicians: city={city}, state={state_code}, "
-        f"condition={condition}, taxonomy_codes={taxonomy_codes}"
-    )
+    logger.info(f"Fetching physicians: city={city}, state={state_code}, condition={condition}")
 
     seen_npis: set = set()
     physicians_to_geocode: list = []
@@ -375,10 +369,10 @@ async def fetch_physicians_near(
     if taxonomy_codes:
         await collect(city, state_code, strict_city=city, codes=taxonomy_codes)
         if not physicians_to_geocode and state_code:
-            logger.warning(f"No results in city={city}. Trying state={state_code}.")
+            logger.warning(f"No results for city={city}, trying state={state_code}")
             await collect(None, state_code, strict_city=None, codes=taxonomy_codes)
         if not physicians_to_geocode:
-            logger.warning("No specialty matches. Falling back to unfiltered physician search.")
+            logger.warning("No specialty matches, falling back to unfiltered search")
             raw_results = await _query_nppes(city, state_code, limit * 5)
             for item in raw_results:
                 parsed = _parse_physician(item, expected_city=city)
@@ -395,7 +389,7 @@ async def fetch_physicians_near(
             if len(physicians_to_geocode) >= limit:
                 break
 
-    logger.info(f"Found {len(physicians_to_geocode)} physicians before geocoding.")
+    logger.info(f"Found {len(physicians_to_geocode)} physicians before geocoding")
     if not physicians_to_geocode:
         return []
 
@@ -412,11 +406,9 @@ async def fetch_physicians_near(
         }
 
     results = await asyncio.gather(*[geocode_physician(p) for p in physicians_to_geocode])
-    logger.info(f"Returning {len(results)} physicians.")
+    logger.info(f"Returning {len(results)} physicians")
     return list(results)[:5]
 
 
-# FIX: physicians.py imports `fetch_physicians_accurate` but the function
-# above is named `fetch_physicians_near`. This alias makes both names work
-# without renaming anything else in the codebase.
+# Alias so physicians.py import works with either name
 fetch_physicians_accurate = fetch_physicians_near

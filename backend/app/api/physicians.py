@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 from typing import Optional
-from app.services.nppes_api import fetch_physicians_accurate
+from app.services.nppes_api import fetch_physicians_near
 
 router = APIRouter()
 
@@ -11,20 +11,10 @@ async def get_physicians(
     condition: Optional[str] = Query(None),
     specialty: Optional[str] = Query(None),
 ):
-    """
-    ✅ NEW: Get physicians with 100% ACCURATE filtering
-    
-    All filters use AND logic (must match ALL filters applied)
-    - city: Physician's practice city (case-insensitive substring match)
-    - state: Physician's practice state (case-insensitive match)
-    - condition: Maps to specialty taxonomy codes
-    - specialty: Filter by specific specialty description
-    """
-    physicians = await fetch_physicians_accurate(
+    physicians = await fetch_physicians_near(
         city=city,
         state=state,
         condition=condition,
-        specialty=specialty,
     )
     return {
         "filters": {
@@ -34,5 +24,5 @@ async def get_physicians(
             "specialty": specialty,
         },
         "count": len(physicians),
-        "results": physicians
+        "results": physicians,
     }
