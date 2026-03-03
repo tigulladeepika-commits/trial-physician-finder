@@ -145,6 +145,26 @@ KEYWORD_SPECIALTY_MAP: list[tuple[str, list[str]]] = [
 
 DEFAULT_SPECIALTIES = ["Internal Medicine", "Family Medicine"]
 
+# FIX Bug 5: Conditions that exist in CONDITION_TO_SPECIALTIES but were missing
+# from CONDITION_SYNONYMS in clinicaltrial_api.py. These expansions should be
+# added to CONDITION_SYNONYMS to keep both files in sync.
+MISSING_CONDITION_SYNONYMS: dict[str, str] = {
+    "myeloma":          "multiple myeloma OR myeloma OR plasma cell neoplasm OR bone marrow cancer",
+    "colorectal cancer":"colorectal cancer OR colon cancer OR rectal cancer OR colorectal carcinoma OR CRC",
+    "ibd":              "inflammatory bowel disease OR IBD OR Crohn OR ulcerative colitis",
+    "irritable bowel":  "irritable bowel syndrome OR IBS OR functional bowel disorder",
+    "gerd":             "GERD OR gastroesophageal reflux OR acid reflux OR reflux disease",
+    "renal disease":    "renal disease OR kidney disease OR CKD OR chronic kidney OR nephropathy OR renal failure",
+    "ckd":              "chronic kidney disease OR CKD OR renal insufficiency OR kidney failure OR nephropathy",
+    "dementia":         "dementia OR Alzheimer OR cognitive decline OR memory loss OR neurodegenerative",
+    "arrhythmia":       "arrhythmia OR cardiac arrhythmia OR atrial fibrillation OR ventricular OR dysrhythmia",
+    "hypothyroidism":   "hypothyroidism OR underactive thyroid OR Hashimoto OR thyroid deficiency",
+    "hyperthyroidism":  "hyperthyroidism OR overactive thyroid OR Graves disease OR thyrotoxicosis",
+    "melanoma":         "melanoma OR skin cancer OR cutaneous melanoma OR malignant melanoma",
+    "pediatric":        "pediatric OR childhood OR children OR juvenile OR neonatal",
+    "childhood":        "childhood OR pediatric OR children OR juvenile",
+}
+
 
 def get_specialties_for_condition(condition: str) -> list[str]:
     """

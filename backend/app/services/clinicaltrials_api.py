@@ -90,6 +90,23 @@ CONDITION_SYNONYMS = {
     "menopause": "menopause OR menopausal OR postmenopausal OR hormone replacement",
     "chronic pain": "chronic pain OR neuropathic pain OR fibromyalgia OR pain management",
     "fibromyalgia": "fibromyalgia OR chronic widespread pain OR fibromyalgia syndrome",
+
+    # FIX Bug 5: Added missing synonyms that exist in condition_specialty_mapping
+    # but were absent here, causing bare keyword searches with fewer API results.
+    "myeloma":          "multiple myeloma OR myeloma OR plasma cell neoplasm OR bone marrow cancer",
+    "colorectal cancer":"colorectal cancer OR colon cancer OR rectal cancer OR colorectal carcinoma OR CRC",
+    "ibd":              "inflammatory bowel disease OR IBD OR Crohn OR ulcerative colitis",
+    "irritable bowel":  "irritable bowel syndrome OR IBS OR functional bowel disorder",
+    "gerd":             "GERD OR gastroesophageal reflux OR acid reflux OR reflux disease",
+    "renal disease":    "renal disease OR kidney disease OR CKD OR chronic kidney OR nephropathy OR renal failure",
+    "ckd":              "chronic kidney disease OR CKD OR renal insufficiency OR kidney failure OR nephropathy",
+    "dementia":         "dementia OR Alzheimer OR cognitive decline OR memory loss OR neurodegenerative",
+    "arrhythmia":       "arrhythmia OR cardiac arrhythmia OR atrial fibrillation OR ventricular OR dysrhythmia",
+    "hypothyroidism":   "hypothyroidism OR underactive thyroid OR Hashimoto OR thyroid deficiency",
+    "hyperthyroidism":  "hyperthyroidism OR overactive thyroid OR Graves disease OR thyrotoxicosis",
+    "melanoma":         "melanoma OR skin cancer OR cutaneous melanoma OR malignant melanoma",
+    "pediatric":        "pediatric OR childhood OR children OR juvenile OR neonatal",
+    "childhood":        "childhood OR pediatric OR children OR juvenile",
 }
 
 
@@ -113,6 +130,7 @@ def _expand_location(location: str) -> str | None:
 def fetch_trials(
     condition: str,
     location: str = "",
+    specialty: str = "",
     limit: int = 20,
     offset: int = 0,
 ) -> tuple[list, int]:
@@ -127,10 +145,20 @@ def fetch_trials(
     }
     if location_query:
         params["query.locn"] = location_query
+    # FIX Bug 4: specialty now actually sent to the API via query.term
+    if specialty and specialty.strip():
+        params["query.term"] = specialty.strip()
     if offset > 0:
         page_token = _get_page_token(params, offset)
         if page_token:
             params["pageToken"] = page_token
+
+    # FIX Bug 4: Pass specialty as a keyword search term so the API actually
+    # uses it. Previously, specialty was accepted by the route but never sent
+    # to the ClinicalTrials API — it was silently dropped.
+    # Note: fetch_trials is called from fetch_trials_with_filters which strips
+    # specialty out; if you want to support it end-to-end, pass it through or
+    # add query.term here from the filters dict at the call site.
 
     try:
         response = requests.get(CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15)
@@ -209,19 +237,24 @@ def fetch_trials_with_filters(
     location_str = ", ".join(filter(None, [filters.get("city"), filters.get("state")]))
     condition_str = filters.get("condition", "")
 
-    api_results, _ = fetch_trials(
+    # FIX 1 & 2: Fetch a larger pool so post-filters (status/phase/location)
+    # still leave enough results. The condition filter is handled by the API
+    # itself via synonym expansion — do NOT re-filter by condition after the
+    # fact, as the API may return trials whose condition field uses a synonym
+    # (e.g. "HER2-positive Breast Neoplasm") that doesn't contain the raw
+    # search term (e.g. "breast cancer").
+    api_results, api_total = fetch_trials(
         condition=condition_str,
         location=location_str,
-        limit=limit * 3,
+        specialty=filters.get("specialty", ""),
+        limit=limit * 5,
         offset=offset,
     )
 
     filtered = []
     for trial in api_results:
-        if filters.get("condition"):
-            trial_conds = [c.lower() for c in trial.get("conditions", [])]
-            if not any(filters["condition"].lower() in c for c in trial_conds):
-                continue
+        # ❌ REMOVED: condition re-filter — was causing most results to be dropped.
+        # The ClinicalTrials API already handles condition matching via query.cond.
 
         if filters.get("status"):
             if filters["status"].upper() not in trial.get("status", "").upper():
@@ -247,8 +280,10 @@ def fetch_trials_with_filters(
         if len(filtered) >= limit:
             break
 
-    logger.info(f"fetch_trials_with_filters: {len(filtered)} results for filters={filters}")
-    return filtered, len(filtered)
+    # FIX 3: Return the real API total count (not len(filtered)) so that
+    # frontend pagination correctly reflects how many trials exist in total.
+    logger.info(f"fetch_trials_with_filters: {len(filtered)} results (api_total={api_total}) for filters={filters}")
+    return filtered, api_total
 
 
 # Alias so both trials.py import names work
