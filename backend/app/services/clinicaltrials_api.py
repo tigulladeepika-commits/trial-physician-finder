@@ -45,7 +45,6 @@ CONDITION_SYNONYMS = {
     "bladder cancer": "bladder cancer OR urothelial carcinoma OR bladder neoplasm",
     "thyroid cancer": "thyroid cancer OR thyroid carcinoma OR papillary thyroid OR follicular thyroid",
     "stomach cancer": "stomach cancer OR gastric cancer OR gastric carcinoma OR gastroesophageal",
-
     # ── Cardiovascular ─────────────────────────────────────────────────
     "cardiology": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial OR heart disease",
     "heart disease": "cardiac OR cardiovascular OR coronary OR heart failure OR arrhythmia OR myocardial",
@@ -54,14 +53,12 @@ CONDITION_SYNONYMS = {
     "hypertension": "hypertension OR high blood pressure OR arterial hypertension",
     "atrial fibrillation": "atrial fibrillation OR AFib OR atrial flutter OR cardiac arrhythmia",
     "stroke": "stroke OR cerebrovascular OR ischemic stroke OR hemorrhagic stroke OR TIA OR transient ischemic",
-
     # ── Metabolic / Endocrine ───────────────────────────────────────────
     "diabetes": "diabetes mellitus OR diabetic OR hyperglycemia OR insulin resistance OR type 2 diabetes OR type 1 diabetes",
     "type 1 diabetes": "type 1 diabetes OR T1D OR juvenile diabetes OR insulin dependent diabetes",
     "type 2 diabetes": "type 2 diabetes OR T2D OR adult onset diabetes OR non-insulin dependent diabetes",
     "obesity": "obesity OR overweight OR bariatric OR adiposity OR metabolic syndrome OR weight loss",
     "thyroid disease": "thyroid OR hypothyroidism OR hyperthyroidism OR Hashimoto OR Graves disease",
-
     # ── Neurological ───────────────────────────────────────────────────
     "alzheimer": "Alzheimer OR dementia OR cognitive decline OR memory loss OR neurodegenerative",
     "alzheimers": "Alzheimer OR dementia OR cognitive decline OR memory loss OR neurodegenerative",
@@ -71,7 +68,6 @@ CONDITION_SYNONYMS = {
     "epilepsy": "epilepsy OR seizure OR convulsion OR anticonvulsant",
     "migraine": "migraine OR headache OR cluster headache",
     "als": "ALS OR amyotrophic lateral sclerosis OR motor neuron disease OR Lou Gehrig",
-
     # ── Mental Health ──────────────────────────────────────────────────
     "mental health": "depression OR anxiety OR bipolar OR schizophrenia OR PTSD OR psychiatric OR psychological",
     "depression": "depression OR major depressive disorder OR MDD OR depressive episode",
@@ -81,13 +77,11 @@ CONDITION_SYNONYMS = {
     "ptsd": "PTSD OR post-traumatic stress OR trauma OR post traumatic",
     "adhd": "ADHD OR attention deficit OR hyperactivity disorder OR ADD",
     "autism": "autism OR ASD OR autism spectrum disorder OR Asperger",
-
     # ── Respiratory ────────────────────────────────────────────────────
     "asthma": "asthma OR bronchial asthma OR reactive airway disease",
     "copd": "COPD OR chronic obstructive pulmonary OR emphysema OR chronic bronchitis",
     "covid": "COVID OR SARS-CoV-2 OR coronavirus OR post-COVID OR long COVID",
     "pneumonia": "pneumonia OR respiratory infection OR lung infection",
-
     # ── Autoimmune / Inflammatory ──────────────────────────────────────
     "arthritis": "arthritis OR rheumatoid arthritis OR osteoarthritis OR joint inflammation",
     "rheumatoid arthritis": "rheumatoid arthritis OR RA OR rheumatoid OR synovitis",
@@ -95,19 +89,15 @@ CONDITION_SYNONYMS = {
     "crohn": "Crohn OR inflammatory bowel disease OR IBD OR Crohn's disease",
     "ulcerative colitis": "ulcerative colitis OR IBD OR inflammatory bowel OR colitis",
     "psoriasis": "psoriasis OR psoriatic arthritis OR plaque psoriasis",
-
     # ── Infectious Disease ─────────────────────────────────────────────
     "hiv": "HIV OR AIDS OR antiretroviral OR human immunodeficiency virus",
     "hepatitis": "hepatitis OR hepatitis B OR hepatitis C OR HBV OR HCV OR liver inflammation",
     "tuberculosis": "tuberculosis OR TB OR mycobacterium tuberculosis",
-
     # ── Kidney / Renal ─────────────────────────────────────────────────
     "kidney disease": "kidney disease OR renal disease OR chronic kidney disease OR CKD OR renal failure OR nephropathy",
-
     # ── Women's Health ─────────────────────────────────────────────────
     "endometriosis": "endometriosis OR endometrial OR uterine",
     "menopause": "menopause OR menopausal OR postmenopausal OR hormone replacement",
-
     # ── Pain ───────────────────────────────────────────────────────────
     "chronic pain": "chronic pain OR neuropathic pain OR fibromyalgia OR pain management",
     "fibromyalgia": "fibromyalgia OR chronic widespread pain OR fibromyalgia syndrome",
@@ -140,10 +130,6 @@ def fetch_trials(
     limit: int = 20,
     offset: int = 0,
 ) -> tuple[list, int]:
-    """
-    Returns a tuple of (results, total_count).
-    total_count is the full number of matching studies from the API.
-    """
     location_query = _expand_location(location)
     condition_query = _expand_condition(condition)
 
@@ -265,106 +251,72 @@ def fetch_trials_with_filters(
     limit: int = 10,
     offset: int = 0,
 ) -> tuple[list, int]:
-    """
-    ✅ NEW: Fetch trials with 100% ACCURATE filtering on all parameters
-    
-    Filters dict can have:
-    - condition: Trial condition name
-    - city: Trial location city
-    - state: Trial location state
-    - status: Trial status (RECRUITING, COMPLETED, TERMINATED, etc)
-    - phase: Trial phase (PHASE1, PHASE2, PHASE3, PHASE4)
-    - specialty: (Note: specialty filtering requires physician data, not in trial data)
-    
-    Returns: (filtered_trials, total_count)
-    """
-    
-    # Build initial API query from condition and location
     location_str = ""
     if filters.get('city') or filters.get('state'):
         location_str = ", ".join(filter(None, [filters.get('city'), filters.get('state')]))
-    
+
     condition_str = filters.get('condition', '')
-    
-    # Fetch from API
+
     api_results, api_total = fetch_trials(
         condition=condition_str,
         location=location_str,
-        limit=limit * 3,  # Get more results to filter locally
+        limit=limit * 3,
         offset=offset
     )
-    
-    # ✅ POST-FILTER for 100% accuracy
+
     filtered_results = []
-    
+
     for trial in api_results:
-        # ✅ Check CONDITION filter
         if filters.get('condition'):
             trial_conditions = [c.lower() for c in trial.get('conditions', [])]
             condition_match = any(
-                filters['condition'].lower() in cond 
+                filters['condition'].lower() in cond
                 for cond in trial_conditions
             )
             if not condition_match:
-                logger.debug(f"Trial {trial.get('nctId')} filtered out: condition mismatch")
                 continue
-        
-        # ✅ Check STATUS filter
+
         if filters.get('status'):
             trial_status = trial.get('status', '').upper()
-            status_filter = filters['status'].upper()
-            status_match = status_filter in trial_status
-            if not status_match:
-                logger.debug(f"Trial {trial.get('nctId')} filtered out: status mismatch ({trial_status} vs {status_filter})")
+            if filters['status'].upper() not in trial_status:
                 continue
-        
-        # ✅ Check PHASE filter
+
         if filters.get('phase'):
             trial_phases = [p.upper() for p in trial.get('phases', [])]
-            phase_filter = filters['phase'].upper()
-            phase_match = any(phase_filter in phase for phase in trial_phases)
-            if not phase_match:
-                logger.debug(f"Trial {trial.get('nctId')} filtered out: phase mismatch ({trial_phases} vs {phase_filter})")
+            if not any(filters['phase'].upper() in phase for phase in trial_phases):
                 continue
-        
-        # ✅ Check CITY/STATE filters
+
         if filters.get('city') or filters.get('state'):
             locations = trial.get('locations', [])
             location_match = False
-            
             for location in locations:
                 loc_city = location.get('city', '').lower()
                 loc_state = location.get('state', '').lower()
-                
-                city_match = True
-                state_match = True
-                
-                if filters.get('city'):
-                    city_match = filters['city'].lower() in loc_city
-                
-                if filters.get('state'):
-                    state_match = filters['state'].lower() in loc_state
-                
-                if city_match and state_match:
+                city_ok = not filters.get('city') or filters['city'].lower() in loc_city
+                state_ok = not filters.get('state') or filters['state'].lower() in loc_state
+                if city_ok and state_ok:
                     location_match = True
                     break
-            
             if not location_match:
-                logger.debug(f"Trial {trial.get('nctId')} filtered out: location mismatch")
                 continue
-        
-        # ✅ All filters passed
+
         filtered_results.append(trial)
-        
+
         if len(filtered_results) >= limit:
             break
-    
+
     logger.info(
         f"Filtered {len(api_results)} trials down to {len(filtered_results)} "
         f"with filters: {filters}"
     )
-    
+
     return filtered_results, len(filtered_results)
+
+
+# FIX: trials.py imports `fetch_trials_accurate` but the function above is
+# named `fetch_trials_with_filters`. This alias makes both names work so
+# nothing else in the codebase breaks.
+fetch_trials_accurate = fetch_trials_with_filters
 
 
 def _get_filter_keywords(condition: str) -> list[str]:
