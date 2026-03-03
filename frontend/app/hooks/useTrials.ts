@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchTrials } from "../utils/api";
 import { Trial } from "../types";
 
-const DEBOUNCE_MS = 450;
 const PAGE_SIZE = 10;
 
 export function useTrials(
@@ -13,77 +12,61 @@ export function useTrials(
   state: string | null,
   specialty?: string,
   status?: string,
-  phase?: string,
+  phase?: string
 ) {
   const [trials, setTrials] = useState<Trial[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
-  const requestId = useRef(0);
-
-  // Core fetch — exported so page.tsx refetch button works
-  const doFetch = useCallback(
-    async (pageNum: number, append: boolean) => {
-      if (!condition?.trim()) {
-        setTrials([]); setTotalCount(0); return;
-      }
-      const currentId = ++requestId.current;
+  const load = useCallback(
+    async (pageNum: number, replace: boolean) => {
+      if (!condition) return;
       setLoading(true);
       setError(null);
-
       try {
-        const data = await fetchTrials(
+        const locationStr = [city, state].filter(Boolean).join(", ");
+        const data: Trial[] = await fetchTrials(
           condition,
-          city ?? "",
-          state ?? "",
+          locationStr || "",
+          "",
           specialty,
-          PAGE_SIZE,
-          (pageNum - 1) * PAGE_SIZE,
-          status,
-          phase,
+          PAGE_SIZE
         );
-
-        if (currentId !== requestId.current) return;
-
-        // Backend returns { trials, totalCount } or just an array
-        const newTrials: Trial[] = Array.isArray(data) ? data : (data.trials ?? []);
-        const total: number = Array.isArray(data) ? newTrials.length : (data.totalCount ?? newTrials.length);
-
-        setTrials((prev) => append ? [...prev, ...newTrials] : newTrials);
-        setTotalCount(total);
-      } catch (err) {
-        if (currentId !== requestId.current) return;
-        console.error("Failed to fetch trials:", err);
+        const fetched = data ?? [];
+        setTrials(prev => replace ? fetched : [...prev, ...fetched]);
+        setTotalCount(prev => replace ? fetched.length : prev + fetched.length);
+        setHasMore(fetched.length === PAGE_SIZE);
+      } catch (e) {
         setError("Failed to load trials. Please try again.");
       } finally {
-        if (currentId === requestId.current) setLoading(false);
+        setLoading(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [condition, city, state, specialty, status, phase]
+    [condition, city, state, specialty]
   );
 
-  // Reset to page 1 and re-fetch whenever filters change (debounced)
   useEffect(() => {
     setPage(1);
-    const t = setTimeout(() => doFetch(1, false), DEBOUNCE_MS);
-    return () => clearTimeout(t);
-  }, [doFetch]);
+    setTrials([]);
+    setTotalCount(0);
+    load(1, true);
+  }, [condition, city, state, specialty, status, phase]);
 
-  const refetch = useCallback(() => {
+  const refetch = () => {
     setPage(1);
-    doFetch(1, false);
-  }, [doFetch]);
+    setTrials([]);
+    setTotalCount(0);
+    load(1, true);
+  };
 
-  const loadMore = useCallback(() => {
+  const loadMore = () => {
     const next = page + 1;
     setPage(next);
-    doFetch(next, true);
-  }, [page, doFetch]);
-
-  const hasMore = trials.length < totalCount;
+    load(next, false);
+  };
 
   return { trials, loading, error, totalCount, hasMore, refetch, loadMore };
 }

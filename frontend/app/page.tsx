@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PhysicianFilters } from "./components/PhysicianFilters";
-import { PhysicianList } from "./components/PhysicianList";
+import PhysicianFilters from "./components/PhysicianFilters";
 import TrialCard from "./components/TrialCard";
 import { Trial } from "./types";
 import { useTrials } from "./hooks/useTrials";
@@ -99,7 +98,6 @@ export default function Home() {
                     <TrialCard
                       key={trial.nctId}
                       trial={trial}
-                      onClick={() => console.log("Trial clicked:", trial.nctId)}
                     />
                   ))}
                 </div>
