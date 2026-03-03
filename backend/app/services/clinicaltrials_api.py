@@ -192,25 +192,18 @@ def fetch_trials(
     }
     if location_query:
         params["query.locn"] = location_query
-    # FIX Bug 4: specialty now actually sent to the API via query.term
+    # Specialty passed as keyword search (query.term)
     if specialty and specialty.strip():
         params["query.term"] = specialty.strip()
+    # Status sent directly to API as filter.overallStatus (exact enum match)
     if status and status.strip():
         normalized = _normalize_status(status)
         if normalized:
-            params["filter.overallStatus"] = normalized  # FIX: pre-filter at API level
-        params["query.term"] = specialty.strip()
+            params["filter.overallStatus"] = normalized
     if offset > 0:
         page_token = _get_page_token(params, offset)
         if page_token:
             params["pageToken"] = page_token
-
-    # FIX Bug 4: Pass specialty as a keyword search term so the API actually
-    # uses it. Previously, specialty was accepted by the route but never sent
-    # to the ClinicalTrials API — it was silently dropped.
-    # Note: fetch_trials is called from fetch_trials_with_filters which strips
-    # specialty out; if you want to support it end-to-end, pass it through or
-    # add query.term here from the filters dict at the call site.
 
     try:
         response = requests.get(CLINICAL_TRIALS_BASE_URL, params=params, headers=HEADERS, timeout=15)
