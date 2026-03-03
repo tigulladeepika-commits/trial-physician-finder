@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap');
+/* ✅ @import removed — DM Sans + DM Serif Display are loaded via <link> tags in layout.tsx */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 .page-header { background: white; border-bottom: 1px solid #e8eaed; padding: 0 24px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
