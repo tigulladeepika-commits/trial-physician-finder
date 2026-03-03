@@ -114,7 +114,6 @@ STATE_ABBR = {
     "wisconsin": "WI", "wyoming": "WY", "district of columbia": "DC", "puerto rico": "PR",
 }
 
-# Full taxonomy code → display description
 CODE_TO_DESCRIPTION = {
     "207R00000X": "Internal Medicine",
     "207RB0002X": "Obesity Medicine",
@@ -333,8 +332,8 @@ def _parse_physician(item: dict, expected_city: str | None = None) -> dict | Non
         "address": practice_address.get("address_1"),
         "postal_code": practice_address.get("postal_code"),
         "specialty": taxonomy_description,
-        "taxonomyCode": taxonomy_code,               # ← NEW
-        "taxonomyDescription": taxonomy_description, # ← NEW
+        "taxonomyCode": taxonomy_code,
+        "taxonomyDescription": taxonomy_description,
         "full_address": full_address,
     }
 
@@ -415,3 +414,9 @@ async def fetch_physicians_near(
     results = await asyncio.gather(*[geocode_physician(p) for p in physicians_to_geocode])
     logger.info(f"Returning {len(results)} physicians.")
     return list(results)[:5]
+
+
+# FIX: physicians.py imports `fetch_physicians_accurate` but the function
+# above is named `fetch_physicians_near`. This alias makes both names work
+# without renaming anything else in the codebase.
+fetch_physicians_accurate = fetch_physicians_near
