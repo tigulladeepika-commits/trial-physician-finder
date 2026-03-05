@@ -60,11 +60,11 @@ function MapQuestMap({ center, trialLocations, physicians, radius }: MapViewProp
         // Set API key before any MQ calls
         MQ.KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY || "YOUR_MAPQUEST_API_KEY";
 
-        // Create the MapQuest map
+        // FIX: MQ.mapquest.map() requires center as { lat, lng } object — NOT an array
         const map = MQ.mapquest.map(container, {
-          center: { lat: center[0], lng: center[1] },
+          center: MQ.latLng(center[0], center[1]),
           zoom: 4,
-          type: "map", // "map" | "sat" | "hyb"
+          type: "map",
         });
 
         if (cancelled) {
@@ -74,25 +74,19 @@ function MapQuestMap({ center, trialLocations, physicians, radius }: MapViewProp
 
         mapRef.current = map;
 
-        // ------------------------------------------------------------------
-        // Trial location markers — use MQ.marker() so they work with MQ map
-        // ------------------------------------------------------------------
+        // Trial location markers
         trialLocations.forEach(({ lat, lon }) => {
           if (!lat || !lon) return;
-          MQ.marker({ lat, lng: lon })
+          MQ.marker(MQ.latLng(lat, lon))
             .bindPopup(
               `<strong>Trial Location</strong><br/>Lat: ${lat.toFixed(2)}, Lon: ${lon.toFixed(2)}`
             )
             .addTo(map);
         });
 
-        // ------------------------------------------------------------------
-        // Physician markers — use MQ.marker() with a custom blue icon
-        // ------------------------------------------------------------------
+        // Physician markers
         physicians.forEach((p) => {
           if (!p.lat || !p.lon) return;
-
-          // MQ.marker supports a custom icon via L.icon since MQ extends Leaflet
           const blueIcon = L.icon({
             iconUrl:
               "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
@@ -102,15 +96,12 @@ function MapQuestMap({ center, trialLocations, physicians, radius }: MapViewProp
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
           });
-
-          MQ.marker({ lat: p.lat, lng: p.lon }, { icon: blueIcon })
+          MQ.marker(MQ.latLng(p.lat, p.lon), { icon: blueIcon })
             .bindPopup(`<strong>${p.name}</strong><br/>${p.specialty ?? "N/A"}`)
             .addTo(map);
         });
 
-        // ------------------------------------------------------------------
-        // Radius circle — L.circle works fine on MQ maps (MQ extends Leaflet)
-        // ------------------------------------------------------------------
+        // Radius circle — L.circle works on MQ maps since MQ extends Leaflet
         if (radius > 0) {
           L.circle([center[0], center[1]], {
             radius: radius * 1609.34, // miles → meters
