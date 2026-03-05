@@ -11,9 +11,15 @@ type Props = {
 
 const MQ_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY ?? "";
 
-declare global {
-  interface Window { L: any; }
-}
+const TILE_URL = MQ_KEY
+  ? `https://tile.mapquest.com/tiles/1.0.0/map/{z}/{x}/{y}.jpg?key=${MQ_KEY}`
+  : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+const TILE_ATTR = MQ_KEY
+  ? '&copy; <a href="https://www.mapquest.com/">MapQuest</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
+declare global { interface Window { L: any; } }
 
 export default function TrialMap({ trials, searchedCity, searchedState }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -23,13 +29,10 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
   const [isClient, setIsClient] = useState(false);
   const hasLocationFilter = !!(searchedCity || searchedState);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  useEffect(() => { setIsClient(true); }, []);
 
   useEffect(() => {
     if (!isClient) return;
-
     let cancelled = false;
 
     const timer = setTimeout(() => {
@@ -44,20 +47,10 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         }
         const container = mapRef.current;
         (container as any)._leaflet_id = null;
-
         if (cancelled) return;
 
-        // Create map with MapQuest tiles
         const map = L.map(container).setView([39.5, -98.35], hasLocationFilter ? 8 : 4);
-
-        L.tileLayer(
-          `https://open.mapquestapi.com/tiles/1.0.0/map/{z}/{x}/{y}?key=${MQ_KEY}`,
-          {
-            attribution: '&copy; <a href="https://www.mapquest.com/">MapQuest</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-            maxZoom: 18,
-          }
-        ).addTo(map);
-
+        L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 18 }).addTo(map);
         mapInstance.current = map;
 
         const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
@@ -65,10 +58,8 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
           for (const loc of trial.locations ?? []) {
             if (!loc.lat || !loc.lon || loc.country !== "United States") continue;
             if (hasLocationFilter) {
-              const cityMatch = searchedCity
-                ? (loc.city ?? "").toLowerCase().includes(searchedCity.toLowerCase()) : true;
-              const stateMatch = searchedState
-                ? (loc.state ?? "").toLowerCase().includes(searchedState.toLowerCase()) : true;
+              const cityMatch = searchedCity ? (loc.city ?? "").toLowerCase().includes(searchedCity.toLowerCase()) : true;
+              const stateMatch = searchedState ? (loc.state ?? "").toLowerCase().includes(searchedState.toLowerCase()) : true;
               if (searchedCity && searchedState && !cityMatch && !stateMatch) continue;
               else if (searchedCity && !searchedState && !cityMatch) continue;
               else if (searchedState && !searchedCity && !stateMatch) continue;
@@ -80,23 +71,17 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         for (const p of points) {
           L.marker([p.lat, p.lon])
             .addTo(map)
-            .bindPopup(`
-              <div style="max-width:200px;font-family:sans-serif">
-                <strong style="font-size:12px;color:#1a56db">${p.nctId}</strong><br/>
-                <span style="font-size:11px;color:#555">${p.title.slice(0, 80)}${p.title.length > 80 ? "..." : ""}</span>
-              </div>
-            `);
+            .bindPopup(`<div style="max-width:200px;font-family:sans-serif">
+              <strong style="font-size:12px;color:#1a56db">${p.nctId}</strong><br/>
+              <span style="font-size:11px;color:#555">${p.title.slice(0, 80)}${p.title.length > 80 ? "..." : ""}</span>
+            </div>`);
         }
 
         if (hasLocationFilter && points.length > 0) {
           const centerLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
           const centerLon = points.reduce((s, p) => s + p.lon, 0) / points.length;
           circleRef.current = L.circle([centerLat, centerLon], {
-            radius: radius * 1000,
-            color: "#1a56db",
-            fillColor: "#bfdbfe",
-            fillOpacity: 0.15,
-            weight: 2,
+            radius: radius * 1000, color: "#1a56db", fillColor: "#bfdbfe", fillOpacity: 0.15, weight: 2,
           }).addTo(map);
         }
 
@@ -110,18 +95,13 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
           ]);
         }
       };
-
       init();
     }, 100);
 
     return () => {
       cancelled = true;
       clearTimeout(timer);
-      if (mapInstance.current) {
-        mapInstance.current.remove();
-        mapInstance.current = null;
-        circleRef.current = null;
-      }
+      if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; circleRef.current = null; }
     };
   }, [trials, searchedCity, searchedState, isClient]);
 
@@ -134,8 +114,8 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
 
   if (!isClient) {
     return (
-      <div style={{ marginBottom: "24px", border: "1px solid #e8eaed", borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-        <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed", display: "flex", alignItems: "center", gap: "12px" }}>
+      <div style={{ marginBottom: "24px", border: "1px solid #e8eaed", borderRadius: "12px", overflow: "hidden" }}>
+        <div style={{ background: "#f8fafc", padding: "10px 16px", borderBottom: "1px solid #e8eaed" }}>
           <span style={{ fontSize: "13px", fontWeight: 600, color: "#374151" }}>📍 Trial Locations</span>
         </div>
         <div style={{ height: "350px", background: "#f1f5f9" }} />
