@@ -54,7 +54,6 @@ export default function Home() {
               <div className="logo-icon">🧬</div>
               <div className="logo-text">Trial<span>Match</span></div>
             </div>
-            <div className="header-pill">Powered by ClinicalTrials.gov</div>
           </div>
         </header>
 

@@ -72,6 +72,9 @@ CONDITION_TO_TAXONOMY_CODES = {
     "arrhythmia":         ["207RC0001X", "207RC0000X"],
     "stroke":             ["2084N0400X", "2084V0102X", "207RC0000X"],
     "coronary":           ["207RC0000X"],
+    "myocardial":         ["207RC0000X", "207RC0001X"],
+    "infarction":         ["207RC0000X", "207RC0001X"],
+    "ischemia":           ["207RC0000X", "207RC0001X"],
     "diabetes":           ["207RE0101X", "207R00000X"],
     "thyroid":            ["207RE0101X"],
     "obesity":            ["207RE0101X", "207R00000X"],
@@ -96,6 +99,19 @@ CONDITION_TO_TAXONOMY_CODES = {
     "adhd":               ["2084P0800X", "2084P0804X", "208000000X"],
     "hiv":                ["207RI0200X", "207R00000X"],
     "bladder":            ["208800000X"],
+    "glaucoma":           ["207W00000X"],
+    "ophthalm":           ["207W00000X"],
+    "retina":             ["207W00000X"],
+    "pulmonary":          ["207RP1001X", "207RC0200X"],
+    "respiratory":        ["207RP1001X", "207K00000X"],
+    "sepsis":             ["207RC0200X", "207R00000X"],
+    "shock":              ["207RC0200X", "207RC0000X"],
+    "liver":              ["207RG0100X", "207RI0008X"],
+    "fibrosis":           ["207RP1001X", "207RG0100X"],
+    "transplant":         ["204F00000X", "207RN0300X"],
+    "pain":               ["208VP0000X", "208VP0014X", "207LP2900X"],
+    "fibromyalgia":       ["208VP0000X", "207RR0500X"],
+    "osteoporosis":       ["207RE0101X", "207RR0500X"],
 }
 
 STATE_ABBR = {
@@ -218,14 +234,22 @@ CODE_TO_DESCRIPTION = {
 
 
 def get_taxonomy_codes_for_condition(condition: str) -> list[str]:
+    """Map a condition string to relevant physician taxonomy codes."""
     if not condition:
         return []
     condition_lower = condition.lower().strip()
+    matched_codes: list[str] = []
+    seen: set[str] = set()
+    # Match all keywords (not just the first) so compound conditions get full coverage
     for keyword in sorted(CONDITION_TO_TAXONOMY_CODES.keys(), key=len, reverse=True):
         if keyword in condition_lower:
-            codes = CONDITION_TO_TAXONOMY_CODES[keyword]
-            logger.info(f"Mapped condition '{condition}' → taxonomy codes {codes}")
-            return codes
+            for code in CONDITION_TO_TAXONOMY_CODES[keyword]:
+                if code not in seen:
+                    seen.add(code)
+                    matched_codes.append(code)
+    if matched_codes:
+        logger.info(f"Mapped condition '{condition}' → taxonomy codes {matched_codes}")
+        return matched_codes
     logger.info(f"No code mapping for '{condition}' — using general physician codes.")
     return ["207R00000X", "207RH0003X", "207RX0202X"]
 
@@ -341,58 +365,85 @@ async def fetch_physicians_near(
     condition: str | None = None,
     limit: int = 10,
 ) -> list:
+    """
+    NEW LOGIC: Condition-first, location-second.
+
+    1. Map condition → relevant taxonomy codes (specialty)
+    2. Query NPPES by taxonomy + location (city/state from trial site)
+    3. If city yields no results, fall back to state-only
+    4. If still no results, fall back to unfiltered location search
+
+    This ensures physicians shown are always relevant to the study condition,
+    then filtered to the trial's geographic area — not the other way around.
+    """
     state_code = normalize_state(state) if state else None
     taxonomy_codes = get_taxonomy_codes_for_condition(condition) if condition else []
 
-    logger.info(f"Fetching physicians: city={city}, state={state_code}, condition={condition}")
+    logger.info(f"Fetching physicians: condition={condition}, city={city}, state={state_code}, codes={taxonomy_codes}")
 
     seen_npis: set = set()
-    physicians_to_geocode: list = []
+    results: list = []
 
-    async def collect(query_city, query_state, strict_city, codes):
+    async def collect_by_taxonomy(query_city, query_state, strict_city, codes):
+        """Query NPPES by condition taxonomy codes + location."""
         for code in codes:
-            if len(physicians_to_geocode) >= limit:
+            if len(results) >= limit:
                 break
             desc = CODE_TO_DESCRIPTION.get(code, "Internal Medicine")
-            raw_results = await _query_nppes(query_city, query_state, limit * 5, desc)
-            for item in raw_results:
+            raw = await _query_nppes(query_city, query_state, limit * 5, desc)
+            for item in raw:
                 npi = item.get("number")
                 if npi in seen_npis:
                     continue
                 seen_npis.add(npi)
                 parsed = _parse_physician(item, expected_city=strict_city)
                 if parsed:
-                    physicians_to_geocode.append(parsed)
-                if len(physicians_to_geocode) >= limit:
+                    results.append(parsed)
+                if len(results) >= limit:
                     break
 
-    if taxonomy_codes:
-        await collect(city, state_code, strict_city=city, codes=taxonomy_codes)
-        if not physicians_to_geocode and state_code:
-            logger.warning(f"No results for city={city}, trying state={state_code}")
-            await collect(None, state_code, strict_city=None, codes=taxonomy_codes)
-        if not physicians_to_geocode:
-            logger.warning("No specialty matches, falling back to unfiltered search")
-            raw_results = await _query_nppes(city, state_code, limit * 5)
-            for item in raw_results:
-                parsed = _parse_physician(item, expected_city=city)
-                if parsed:
-                    physicians_to_geocode.append(parsed)
-                if len(physicians_to_geocode) >= limit:
-                    break
-    else:
-        raw_results = await _query_nppes(city, state_code, limit * 5)
-        for item in raw_results:
-            parsed = _parse_physician(item, expected_city=city)
+    async def collect_unfiltered(query_city, query_state, strict_city):
+        """Fallback: query NPPES by location only, no taxonomy filter."""
+        raw = await _query_nppes(query_city, query_state, limit * 5)
+        for item in raw:
+            npi = item.get("number")
+            if npi in seen_npis:
+                continue
+            seen_npis.add(npi)
+            parsed = _parse_physician(item, expected_city=strict_city)
             if parsed:
-                physicians_to_geocode.append(parsed)
-            if len(physicians_to_geocode) >= limit:
+                results.append(parsed)
+            if len(results) >= limit:
                 break
 
-    logger.info(f"Found {len(physicians_to_geocode)} physicians before geocoding")
-    if not physicians_to_geocode:
+    if taxonomy_codes:
+        # Step 1: condition taxonomy + city (most specific)
+        if city:
+            await collect_by_taxonomy(city, state_code, strict_city=city, codes=taxonomy_codes)
+
+        # Step 2: condition taxonomy + state only (if city gave nothing)
+        if not results and state_code:
+            logger.info(f"No city results for condition, trying state={state_code}")
+            await collect_by_taxonomy(None, state_code, strict_city=None, codes=taxonomy_codes)
+
+        # Step 3: condition taxonomy nationally (if state also gave nothing)
+        if not results:
+            logger.info("No state results for condition, trying national")
+            await collect_by_taxonomy(None, None, strict_city=None, codes=taxonomy_codes)
+
+    # Step 4: unfiltered fallback — location only, no specialty requirement
+    if not results:
+        logger.warning("No condition-matched physicians found, falling back to unfiltered location search")
+        if city:
+            await collect_unfiltered(city, state_code, strict_city=city)
+        if not results and state_code:
+            await collect_unfiltered(None, state_code, strict_city=None)
+
+    logger.info(f"Found {len(results)} physicians before geocoding")
+    if not results:
         return []
 
+    # Geocode all results in parallel
     async def geocode_physician(p: dict) -> dict:
         try:
             geo = await geocode_address(p["full_address"])
@@ -405,9 +456,9 @@ async def fetch_physicians_near(
             "lon": geo.get("lon"),
         }
 
-    results = await asyncio.gather(*[geocode_physician(p) for p in physicians_to_geocode])
-    logger.info(f"Returning {len(results)} physicians")
-    return list(results)[:5]
+    geocoded = await asyncio.gather(*[geocode_physician(p) for p in results[:limit]])
+    logger.info(f"Returning {len(geocoded)} physicians")
+    return list(geocoded)
 
 
 # Alias so physicians.py import works with either name
