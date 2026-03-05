@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Trial, Physician } from "../types";
 import { fetchPhysicians } from "../utils/api";
 import PhysicianCard from "./PhysicianCard";
+import { TrialSaveButton } from "./SaveButton";   // ← NEW
 import dynamic from "next/dynamic";
 const PhysicianTrialMap = dynamic(() => import("./PhysicianTrialMap"), { ssr: false });
 
@@ -13,6 +14,9 @@ type TrialCardProps = {
   trial: Trial;
   searchCity?: string;
   searchState?: string;
+  searchCondition?: string;
+  searchFilters?: Record<string, string>;
+  onPhysiciansLoaded?: (nctId: string, physicians: Physician[]) => void;
 };
 
 const NON_US = ["Israel","Germany","India","Spain","Italy","Australia","Finland","Poland","Netherlands","Sweden","United Kingdom","Canada","France","Taiwan","South Korea","Greece"];
@@ -56,7 +60,7 @@ function PhaseBadge({ phase }: { phase: string }) {
   );
 }
 
-export default function TrialCard({ trial, searchCity, searchState }: TrialCardProps) {
+export default function TrialCard({ trial, searchCity, searchState, searchCondition, searchFilters, onPhysiciansLoaded }: TrialCardProps) {
   const [physicians, setPhysicians] = useState<Physician[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
@@ -130,6 +134,8 @@ export default function TrialCard({ trial, searchCity, searchState }: TrialCardP
 
       setPhysicians(results);
       setFetched(true);
+      // Notify parent so physiciansMap stays in sync for ResultsSaveButton
+      onPhysiciansLoaded?.(trial.nctId, results);
     } catch {
       setFetchError(true);
     } finally {
@@ -319,6 +325,13 @@ export default function TrialCard({ trial, searchCity, searchState }: TrialCardP
                 {showMap ? "Hide Map" : "View on Map"}
               </button>
             )}
+            {/* NEW: Save button — always visible once trial is expanded */}
+            <TrialSaveButton
+              trial={trial}
+              physicians={physicians}
+              searchCondition={searchCondition || ""}
+              searchFilters={searchFilters || {}}
+            />
           </div>
 
           {fetchError && (

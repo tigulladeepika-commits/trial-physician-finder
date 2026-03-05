@@ -64,11 +64,14 @@ CONDITION_SYNONYMS = {
     "thyroid disease":  "thyroid OR hypothyroidism OR hyperthyroidism OR Hashimoto OR Graves disease",
     "hypothyroidism":   "hypothyroidism OR underactive thyroid OR Hashimoto OR thyroid deficiency",
     "hyperthyroidism":  "hyperthyroidism OR overactive thyroid OR Graves disease OR thyrotoxicosis",
-    "alzheimer":        "Alzheimer OR dementia OR cognitive decline OR memory loss OR neurodegenerative",
-    "alzheimers":       "Alzheimer OR dementia OR cognitive decline OR memory loss OR neurodegenerative",
-    "dementia":         "dementia OR Alzheimer OR cognitive decline OR memory loss OR neurodegenerative",
-    "parkinson":        "Parkinson OR parkinsonism OR Lewy body OR dopaminergic",
-    "parkinsons":       "Parkinson OR parkinsonism OR Lewy body OR dopaminergic",
+    # Alzheimer: use only condition-level terms, NOT generic phrases like
+    # "memory loss" or "cognitive decline" — those match unrelated trials
+    # (insomnia, alcohol, brain injury) that merely mention these as endpoints.
+    "alzheimer":        "Alzheimer OR Alzheimer's disease OR Alzheimer disease OR amyloid OR tau pathology",
+    "alzheimers":       "Alzheimer OR Alzheimer's disease OR Alzheimer disease OR amyloid OR tau pathology",
+    "dementia":         "dementia OR Alzheimer OR Lewy body dementia OR vascular dementia OR frontotemporal dementia",
+    "parkinson":        "Parkinson OR Parkinson's disease OR parkinsonism OR Lewy body OR alpha-synuclein",
+    "parkinsons":       "Parkinson OR Parkinson's disease OR parkinsonism OR Lewy body OR alpha-synuclein",
     "multiple sclerosis": "multiple sclerosis OR MS OR demyelinating OR relapsing remitting",
     "epilepsy":         "epilepsy OR seizure OR convulsion OR anticonvulsant",
     "migraine":         "migraine OR headache OR cluster headache",
@@ -132,6 +135,117 @@ STATUS_NORMALIZE: dict[str, str] = {
     "unknown":                  "UNKNOWN",
     "enrolling by invitation":  "ENROLLING_BY_INVITATION",
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONDITION RELEVANCE KEYWORDS
+#
+# The ClinicalTrials.gov query.cond field searches the entire trial record
+# (title, description, keywords, interventions) — not just the conditions[].
+# This means broad synonyms like "cognitive decline" or "neurodegenerative"
+# pull in unrelated trials that merely mention these terms as endpoints.
+#
+# This map defines what must appear in a trial's actual conditions[] array
+# for it to be considered relevant to the user's search. If ANY keyword here
+# matches any condition string, the trial is kept. Otherwise it's dropped.
+#
+# Rules for good keyword sets:
+#   - Match the condition name itself and close clinical synonyms
+#   - Do NOT include generic endpoint words ("cognitive", "memory", "pain")
+#   - Use lowercase — all comparisons are lowercased
+# ─────────────────────────────────────────────────────────────────────────────
+CONDITION_RELEVANCE_KEYWORDS: dict[str, list[str]] = {
+    "alzheimer":         ["alzheimer", "alzheimer's"],
+    "alzheimers":        ["alzheimer", "alzheimer's"],
+    "dementia":          ["dementia", "alzheimer", "lewy body", "frontotemporal", "vascular dementia"],
+    "parkinson":         ["parkinson", "parkinson's", "parkinsonism"],
+    "parkinsons":        ["parkinson", "parkinson's", "parkinsonism"],
+    "multiple sclerosis":["multiple sclerosis", "ms "],
+    "als":               ["amyotrophic lateral sclerosis", "als", "motor neuron disease"],
+    "epilepsy":          ["epilepsy", "epileptic", "seizure"],
+    "migraine":          ["migraine", "headache"],
+    "stroke":            ["stroke", "cerebrovascular", "ischemic stroke", "hemorrhagic stroke", "tia"],
+    "breast cancer":     ["breast cancer", "breast neoplasm", "breast carcinoma", "breast tumor"],
+    "lung cancer":       ["lung cancer", "nsclc", "small cell lung", "pulmonary neoplasm"],
+    "prostate cancer":   ["prostate cancer", "prostate carcinoma", "prostate neoplasm"],
+    "colon cancer":      ["colon cancer", "colorectal", "rectal cancer"],
+    "colorectal cancer": ["colorectal", "colon cancer", "rectal cancer"],
+    "leukemia":          ["leukemia", "aml", "cml", "all ", "cll"],
+    "lymphoma":          ["lymphoma", "hodgkin", "non-hodgkin"],
+    "pancreatic cancer": ["pancreatic cancer", "pancreatic carcinoma"],
+    "liver cancer":      ["liver cancer", "hepatocellular", "hcc"],
+    "melanoma":          ["melanoma"],
+    "myeloma":           ["myeloma", "multiple myeloma"],
+    "diabetes":          ["diabetes", "diabetic", "hyperglycemia"],
+    "type 1 diabetes":   ["type 1 diabetes", "t1d", "juvenile diabetes"],
+    "type 2 diabetes":   ["type 2 diabetes", "t2d"],
+    "hypertension":      ["hypertension", "high blood pressure"],
+    "heart failure":     ["heart failure", "cardiac failure", "cardiomyopathy"],
+    "atrial fibrillation":["atrial fibrillation", "afib", "atrial flutter"],
+    "coronary artery disease":["coronary artery disease", "cad", "angina", "atherosclerosis"],
+    "asthma":            ["asthma", "bronchial asthma"],
+    "copd":              ["copd", "chronic obstructive", "emphysema"],
+    "rheumatoid arthritis":["rheumatoid arthritis", "ra "],
+    "lupus":             ["lupus", "sle", "systemic lupus"],
+    "psoriasis":         ["psoriasis", "psoriatic"],
+    "crohn":             ["crohn", "crohn's", "inflammatory bowel"],
+    "ulcerative colitis":["ulcerative colitis", "inflammatory bowel"],
+    "hiv":               ["hiv", "aids", "human immunodeficiency"],
+    "hepatitis":         ["hepatitis", "hbv", "hcv"],
+    "depression":        ["depression", "major depressive", "mdd"],
+    "anxiety":           ["anxiety", "generalized anxiety", "panic disorder"],
+    "schizophrenia":     ["schizophrenia", "psychosis", "schizoaffective"],
+    "bipolar":           ["bipolar", "manic", "bipolar disorder"],
+    "ptsd":              ["ptsd", "post-traumatic stress", "post traumatic"],
+    "adhd":              ["adhd", "attention deficit"],
+    "autism":            ["autism", "asd", "autism spectrum"],
+    "kidney disease":    ["kidney disease", "renal disease", "chronic kidney", "ckd", "nephropathy"],
+    "obesity":           ["obesity", "obese", "overweight", "bariatric"],
+}
+
+
+def _condition_is_relevant(
+    trial_conditions: list[str],
+    user_condition: str,
+    trial_title: str = "",
+) -> bool:
+    """
+    Check whether a trial is relevant to the user's condition search.
+
+    Checks in priority order:
+      1. No keywords defined → always keep (safe default)
+      2. conditions[] contains user term or clinical synonym → keep
+      3. Trial title contains user term or clinical synonym → keep
+         (catches trials listed under a broad condition like "Neurodegenerative
+          Disease" but whose title clearly names the specific disease)
+      4. None matched → drop
+
+    Title check uses only the core keywords (not the full synonym string) to
+    avoid re-introducing off-topic noise from broad text matches.
+    """
+    key = user_condition.lower().strip()
+    keywords = CONDITION_RELEVANCE_KEYWORDS.get(key)
+
+    if not keywords:
+        return True
+
+    # Pass 1: check conditions[] array
+    for cond in trial_conditions:
+        cond_lower = cond.lower()
+        if key in cond_lower:
+            return True
+        if any(kw in cond_lower for kw in keywords):
+            return True
+
+    # Pass 2: check trial title as fallback
+    if trial_title:
+        title_lower = trial_title.lower()
+        if key in title_lower:
+            return True
+        if any(kw in title_lower for kw in keywords):
+            return True
+
+    return False
 
 
 def _normalize_phase(phase: str) -> str:
@@ -311,10 +425,21 @@ def fetch_trials_with_filters(
         us_only=filters.get("us_only", True),
     )
 
-    # Post-fetch safety net: verify city/state match precisely
-    # (API location search is fuzzy and may return nearby results)
+    # Post-fetch filter loop
     filtered = []
+    user_condition = filters.get("condition", "").strip()
+
     for trial in api_results:
+        # ── Condition relevance check ────────────────────────────────────────
+        # The API's query.cond searches full trial text, not just the conditions
+        # field. Broad synonyms like "cognitive decline" or "neurodegenerative"
+        # pull in trials that mention these terms in descriptions/endpoints but
+        # are actually about Parkinson's, insomnia, alcohol use, etc.
+        # This check verifies the trial's actual conditions[] are on-topic.
+        if user_condition:
+            if not _condition_is_relevant(trial.get("conditions", []), user_condition, trial.get("title", "")):
+                continue
+
         if city or state:
             match = False
             for loc in trial.get("locations", []):

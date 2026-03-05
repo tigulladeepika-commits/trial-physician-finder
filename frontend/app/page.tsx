@@ -1,18 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import PhysicianFilters from "./components/PhysicianFilters";
 import TrialCard from "./components/TrialCard";
-import { Trial } from "./types";
+import { ResultsSaveButton } from "./components/SaveButton";   // ← NEW
+import { Trial, Physician } from "./types";
 import { useTrials } from "./hooks/useTrials";
 
 export default function Home() {
   const [condition, setCondition] = useState<string | null>(null);
-  const [city, setCity] = useState<string | null>(null);
-  const [state, setState] = useState<string | null>(null);
+  const [city, setCity]           = useState<string | null>(null);
+  const [state, setState]         = useState<string | null>(null);
   const [specialty, setSpecialty] = useState<string | undefined>(undefined);
-  const [status, setStatus] = useState<string | undefined>(undefined);
-  const [phase, setPhase] = useState<string | undefined>(undefined);
+  const [status, setStatus]       = useState<string | undefined>(undefined);
+  const [phase, setPhase]         = useState<string | undefined>(undefined);
+
+  // ── NEW: track physicians loaded per trial ───────────────────────────────
+  // This map is populated by TrialCard whenever the user clicks "Find Physicians".
+  // It's lifted up here so ResultsSaveButton can see all loaded physicians
+  // across every card on the page.
+  // Key: nctId  Value: array of physicians
+  const [physiciansMap, setPhysiciansMap] = useState<Record<string, Physician[]>>({});
+
+  const onPhysiciansLoaded = useCallback((nctId: string, physicians: Physician[]) => {
+    setPhysiciansMap(prev => ({ ...prev, [nctId]: physicians }));
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const { trials, loading, totalCount, error, refetch, hasMore, loadMore, hasAnyFilter } = useTrials(
     condition, city, state, specialty, status, phase
@@ -28,6 +41,8 @@ export default function Home() {
     setSpecialty(filters.specialty || undefined);
     setStatus(filters.status || undefined);
     setPhase(filters.phase || undefined);
+    // Clear physicians map when filters change — stale data
+    setPhysiciansMap({});
   };
 
   return (
@@ -43,7 +58,7 @@ export default function Home() {
           </div>
         </header>
 
-        {/* HERO SECTION - ONLY SHOW WHEN NO FILTER APPLIED */}
+        {/* HERO — only when no filter applied */}
         {!hasAnyFilter && (
           <div className="hero">
             <div className="hero-label">Clinical Research Platform</div>
@@ -105,15 +120,48 @@ export default function Home() {
 
             {!loading && !error && trials.length > 0 && (
               <>
+                {/* ── Results header with save button ── */}
                 <div className="results-meta">
-                  <div className="results-count"><strong>{totalCount}</strong> trials found</div>
-                  <div className="results-sub">Showing {trials.length} of {totalCount}</div>
+                  <div>
+                    <div className="results-count"><strong>{totalCount}</strong> trials found</div>
+                    <div className="results-sub">Showing {trials.length} of {totalCount}</div>
+                  </div>
+
+                  {/* NEW: Save button — top right of results */}
+                  <ResultsSaveButton
+                    trials={trials}
+                    physiciansMap={physiciansMap}
+                    searchCondition={condition || ""}
+                    searchFilters={{
+                      status:  status  || "",
+                      phase:   phase   || "",
+                      city:    city    || "",
+                      state:   state   || "",
+                    }}
+                  />
                 </div>
+
+                {/* ── Trial cards ── */}
                 <div className="trial-list">
                   {trials.map((trial: Trial) => (
-                    <TrialCard key={trial.nctId} trial={trial} />
+                    <TrialCard
+                      key={trial.nctId}
+                      trial={trial}
+                      searchCity={city    || undefined}
+                      searchState={state  || undefined}
+                      searchCondition={condition || undefined}
+                      searchFilters={{
+                        status: status || "",
+                        phase:  phase  || "",
+                        city:   city   || "",
+                        state:  state  || "",
+                      }}
+                      // NEW: callback so this card's physicians flow up to physiciansMap
+                      onPhysiciansLoaded={onPhysiciansLoaded}
+                    />
                   ))}
                 </div>
+
                 {hasMore && (
                   <button className="btn-load-more" onClick={loadMore}>Load More Trials</button>
                 )}

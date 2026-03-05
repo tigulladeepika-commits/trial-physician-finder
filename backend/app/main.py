@@ -6,7 +6,7 @@ import os
 
 load_dotenv()
 
-from app.api import trials, physicians
+from app.api import trials, physicians, save          # ← added save
 
 app = FastAPI(title="TrialPhysician Finder API")
 
@@ -21,8 +21,9 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-app.include_router(trials.router, prefix="/api/trials", tags=["Trials"])
+app.include_router(trials.router,     prefix="/api/trials",     tags=["Trials"])
 app.include_router(physicians.router, prefix="/api/physicians", tags=["Physicians"])
+app.include_router(save.router,       tags=["Save"])            # ← added (prefix is defined inside save.py)
 
 
 @app.get("/")
