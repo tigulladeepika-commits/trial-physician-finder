@@ -7,7 +7,13 @@ import PhysicianCard from "./PhysicianCard";
 import dynamic from "next/dynamic";
 const PhysicianTrialMap = dynamic(() => import("./PhysicianTrialMap"), { ssr: false });
 
-type TrialCardProps = { trial: Trial };
+// FIX 3: Accept searchCity + searchState so physician fetch and map circle
+// are centered on what the user actually searched, not random trial sites.
+type TrialCardProps = {
+  trial: Trial;
+  searchCity?: string;
+  searchState?: string;
+};
 
 const NON_US = ["Israel","Germany","India","Spain","Italy","Australia","Finland","Poland","Netherlands","Sweden","United Kingdom","Canada","France","Taiwan","South Korea","Greece"];
 
@@ -50,7 +56,7 @@ function PhaseBadge({ phase }: { phase: string }) {
   );
 }
 
-export default function TrialCard({ trial }: TrialCardProps) {
+export default function TrialCard({ trial, searchCity, searchState }: TrialCardProps) {
   const [physicians, setPhysicians] = useState<Physician[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
@@ -79,53 +85,75 @@ export default function TrialCard({ trial }: TrialCardProps) {
   }, [physicians, taxonomyFilter]);
 
   const handleFetchPhysicians = async () => {
-    if (fetched) { setFetched(false); setPhysicians([]); setShowMap(false); setTaxonomyFilter("all"); return; }
+    if (fetched) {
+      setFetched(false); setPhysicians([]); setShowMap(false); setTaxonomyFilter("all");
+      return;
+    }
     setLoading(true); setFetchError(false);
     try {
-      const usLocs: Array<{ city: string; state: string }> = [];
-      const seen = new Set<string>();
-      for (const loc of trial.locations ?? []) {
-        if (NON_US.some(c => (loc.country ?? "").includes(c))) continue;
-        const city = loc.city ?? ""; const state = loc.state ?? "";
-        if (!city || !state) continue;
-        const key = city.toLowerCase() + "," + state.toLowerCase();
-        if (!seen.has(key)) { seen.add(key); usLocs.push({ city, state }); }
-      }
       const condition = trial.conditions?.[0] ?? "";
-      const locationsToQuery = usLocs.slice(0, 3);
       let results: Physician[] = [];
-      if (locationsToQuery.length > 0) {
-        const allResults = await Promise.all(locationsToQuery.map(({ city, state }) => fetchPhysicians(city, state, condition)));
-        const npiSeen = new Set<string>();
-        for (const batch of allResults) for (const doc of batch) { if (!npiSeen.has(doc.npi)) { npiSeen.add(doc.npi); results.push(doc); } }
+
+      // FIX 3: Physician fetch location priority:
+      // 1. Use searchCity/searchState if the user searched a specific location
+      //    → shows physicians near where the user actually is
+      // 2. Fall back to trial site locations if no search location given
+      //    → original behavior for trials without a location filter
+      if (searchCity || searchState) {
+        results = await fetchPhysicians(searchCity || undefined, searchState || undefined, condition);
       } else {
-        results = await fetchPhysicians(undefined, undefined, condition);
+        // Original behavior: query up to 3 unique US trial site locations
+        const usLocs: Array<{ city: string; state: string }> = [];
+        const seen = new Set<string>();
+        for (const loc of trial.locations ?? []) {
+          if (NON_US.some(c => (loc.country ?? "").includes(c))) continue;
+          const city = loc.city ?? ""; const state = loc.state ?? "";
+          if (!city || !state) continue;
+          const key = city.toLowerCase() + "," + state.toLowerCase();
+          if (!seen.has(key)) { seen.add(key); usLocs.push({ city, state }); }
+        }
+        const locationsToQuery = usLocs.slice(0, 3);
+        if (locationsToQuery.length > 0) {
+          const allResults = await Promise.all(
+            locationsToQuery.map(({ city, state }) => fetchPhysicians(city, state, condition))
+          );
+          const npiSeen = new Set<string>();
+          for (const batch of allResults) {
+            for (const doc of batch) {
+              if (!npiSeen.has(doc.npi)) { npiSeen.add(doc.npi); results.push(doc); }
+            }
+          }
+        } else {
+          results = await fetchPhysicians(undefined, undefined, condition);
+        }
       }
-      setPhysicians(results); setFetched(true);
-    } catch { setFetchError(true); } finally { setLoading(false); }
+
+      setPhysicians(results);
+      setFetched(true);
+    } catch {
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="tc">
-      {/* Header — clicking toggles expand, but text inside is still selectable */}
       <div className="tc-hd" onClick={() => setExpanded(!expanded)}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "9px", flexWrap: "wrap" }}>
               <StatusBadge status={trial.status} />
               {trial.phases?.map(p => <PhaseBadge key={p} phase={p} />)}
-              {/* NCT ID — selectable + copy button */}
               <span className="nct" style={{ display: "inline-flex", alignItems: "center", gap: "3px" }} onClick={e => e.stopPropagation()}>
                 {trial.nctId}
                 <button className="contact-copy-btn" title="Copy NCT ID" onClick={e => { e.stopPropagation(); copyToClipboard(trial.nctId, e.currentTarget); }}>⎘</button>
               </span>
             </div>
-            {/* Title — selectable, click stops card toggle */}
             <h2 style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a", lineHeight: 1.45, margin: 0, userSelect: "text" }} onClick={e => e.stopPropagation()}>
               {trial.title}
             </h2>
           </div>
-          {/* Chevron toggle — not selectable */}
           <div className="tc-toggle-btn" style={{ width: 26, height: 26, borderRadius: "7px", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
               <polyline points="6 9 12 15 18 9" />
@@ -276,7 +304,7 @@ export default function TrialCard({ trial }: TrialCardProps) {
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
-                  Find Physicians
+                  Find Physicians{searchCity || searchState ? ` near ${[searchCity, searchState].filter(Boolean).join(", ")}` : ""}
                 </>}
               </button>
             ) : (
@@ -301,7 +329,13 @@ export default function TrialCard({ trial }: TrialCardProps) {
 
           {fetched && showMap && (
             <div style={{ margin: "0 22px 18px" }}>
-              <PhysicianTrialMap trial={trial} physicians={physicians} />
+              {/* FIX: Pass search location to map so circle centers correctly */}
+              <PhysicianTrialMap
+                trial={trial}
+                physicians={physicians}
+                searchCity={searchCity}
+                searchState={searchState}
+              />
             </div>
           )}
 
@@ -309,7 +343,9 @@ export default function TrialCard({ trial }: TrialCardProps) {
             <div className="physicians-sec">
               <div className="physicians-hd">
                 <div className="physicians-lbl">
-                  Physicians near trial locations
+                  Physicians near {searchCity || searchState
+                    ? [searchCity, searchState].filter(Boolean).join(", ")
+                    : "trial locations"}
                   {trial.conditions?.[0] && <span style={{ fontWeight: 400, color: "#94a3b8" }}>{" · " + trial.conditions[0]}</span>}
                   <span style={{ fontWeight: 400, color: "#94a3b8", marginLeft: "4px" }}>
                     ({filteredPhysicians.length}{taxonomyFilter !== "all" ? ` of ${physicians.length}` : ""})

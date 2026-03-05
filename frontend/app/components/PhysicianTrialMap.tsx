@@ -4,7 +4,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Trial, Physician } from "../types";
 import { geocodeCity, haversineKm } from "../utils/geocode";
 
-type Props = { trial: Trial; physicians: Physician[] };
+// FIX 3: Accept searchCity/searchState so the radius circle centers on what
+// the user searched, not on a random trial site location.
+type Props = {
+  trial: Trial;
+  physicians: Physician[];
+  searchCity?: string;
+  searchState?: string;
+};
 
 const MQ_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY ?? "";
 
@@ -14,24 +21,22 @@ declare global {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SDK LOADER
-//
-// Strategy: Try MapQuest first (richer tiles). If it fails or times out after
-// 8 seconds, fall back to plain Leaflet + OpenStreetMap (free, no key needed).
-// This guarantees the map ALWAYS loads regardless of env var configuration.
+// Strategy: Try MapQuest first. If it fails/times out → Leaflet + OSM fallback.
+// FIX 2: _sdkState is reset to "idle" on module reload so MapQuest is retried
+// after env var rename + redeploy instead of staying stuck on "leaflet-ready".
 // ─────────────────────────────────────────────────────────────────────────────
 
 type MapProvider = "mapquest" | "leaflet";
 
+// These are module-level so multiple map instances share one SDK load
 let _sdkState: "idle" | "loading" | "mq-ready" | "leaflet-ready" | "error" = "idle";
 const _sdkQueue: Array<(provider: MapProvider) => void> = [];
 
 function loadSDK(): Promise<MapProvider> {
   return new Promise((resolve) => {
-    // Already loaded — resolve immediately
     if (_sdkState === "mq-ready")      { resolve("mapquest"); return; }
     if (_sdkState === "leaflet-ready") { resolve("leaflet");  return; }
 
-    // Queue this resolver
     _sdkQueue.push(resolve);
     if (_sdkState === "loading") return;
     _sdkState = "loading";
@@ -41,52 +46,40 @@ function loadSDK(): Promise<MapProvider> {
       _sdkQueue.length = 0;
     }
 
-    // ── Step 2: Load plain Leaflet as fallback (always works, no key) ──
     function loadLeafletFallback() {
-      if (window.L && !window.MQ) {
-        // Leaflet already loaded (maybe from a previous attempt)
+      // If Leaflet is already on the page, use it immediately
+      if (typeof window !== "undefined" && window.L && !window.MQ) {
         _sdkState = "leaflet-ready";
         flushQueue("leaflet");
         return;
       }
-
-      // Leaflet CSS
       if (!document.querySelector('link[href*="leaflet@1"]')) {
         const css = document.createElement("link");
         css.rel = "stylesheet";
         css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
         document.head.appendChild(css);
       }
-
       if (window.L) {
         _sdkState = "leaflet-ready";
         flushQueue("leaflet");
         return;
       }
-
       const script = document.createElement("script");
       script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => {
-        _sdkState = "leaflet-ready";
-        flushQueue("leaflet");
-      };
-      script.onerror = () => {
-        _sdkState = "error";
-        flushQueue("leaflet"); // still try — L might be partial
-      };
+      script.onload = () => { _sdkState = "leaflet-ready"; flushQueue("leaflet"); };
+      script.onerror = () => { _sdkState = "error"; flushQueue("leaflet"); };
       document.head.appendChild(script);
     }
 
-    // ── Step 1: Try MapQuest (better tiles, needs API key) ──
+    // No key → skip straight to Leaflet
     if (!MQ_KEY) {
-      // No key configured — skip straight to Leaflet
       loadLeafletFallback();
       return;
     }
 
-    // Set a timeout: if MapQuest doesn't load in 8s, fall back to Leaflet
+    // Hard timeout: if MapQuest doesn't load in 8s, fall back
     const timeout = setTimeout(() => {
-      console.warn("PhysicianTrialMap: MapQuest SDK timed out — falling back to Leaflet/OSM");
+      console.warn("[TrialMap] MapQuest timed out — falling back to Leaflet/OSM");
       loadLeafletFallback();
     }, 8000);
 
@@ -99,17 +92,15 @@ function loadSDK(): Promise<MapProvider> {
 
     if (!document.querySelector('script[src*="mapquest"]')) {
       const script = document.createElement("script");
-      script.src = `https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js`;
+      script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
 
-      // FIX: onerror catches bad key / network block immediately
       script.onerror = () => {
         clearTimeout(timeout);
-        console.warn("PhysicianTrialMap: MapQuest script failed — falling back to Leaflet/OSM");
+        console.warn("[TrialMap] MapQuest script failed — falling back to Leaflet/OSM");
         loadLeafletFallback();
       };
 
       script.onload = () => {
-        // Script loaded but MQ object might not be ready yet — poll briefly
         let attempts = 0;
         const iv = setInterval(() => {
           attempts++;
@@ -120,7 +111,6 @@ function loadSDK(): Promise<MapProvider> {
             _sdkState = "mq-ready";
             flushQueue("mapquest");
           } else if (attempts > 40) {
-            // 40 × 100ms = 4s — give up and fall back
             clearInterval(iv);
             clearTimeout(timeout);
             loadLeafletFallback();
@@ -134,7 +124,7 @@ function loadSDK(): Promise<MapProvider> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAP COMPONENT
+// COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 type LocPoint = {
@@ -142,7 +132,7 @@ type LocPoint = {
   city: string; state: string; facility: string;
 };
 
-export default function PhysicianTrialMap({ trial, physicians }: Props) {
+export default function PhysicianTrialMap({ trial, physicians, searchCity, searchState }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const circleRef    = useRef<any>(null);
@@ -154,11 +144,10 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
 
   const buildMap = useCallback(async () => {
     if (!containerRef.current) return;
-
     setMapStatus("loading");
     setStatusMsg("Loading map SDK...");
 
-    // ── Destroy any existing map instance ──
+    // Destroy any existing map instance
     if (mapRef.current) {
       try { mapRef.current.remove(); } catch { /* ignore */ }
       mapRef.current  = null;
@@ -168,7 +157,7 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
     (el as any)._leaflet_id = null;
     el.innerHTML = "";
 
-    // ── Load SDK (MapQuest or Leaflet fallback) ──
+    // Load SDK
     let provider: MapProvider;
     try {
       provider = await loadSDK();
@@ -178,10 +167,9 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
       setStatusMsg("Failed to load map library.");
       return;
     }
-
     if (!containerRef.current) return;
 
-    // ── Geocode trial locations ──
+    // Geocode trial site locations
     setMapStatus("geocoding");
     setStatusMsg("Locating trial sites...");
 
@@ -196,23 +184,58 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
       }
     }
 
-    // ── Compute center ──
-    let centerLat = 39.5, centerLon = -98.35, zoom = 4;
-    if (trialPoints.length === 1) {
-      centerLat = trialPoints[0].lat; centerLon = trialPoints[0].lon; zoom = 9;
-    } else if (trialPoints.length > 1) {
-      const lats = trialPoints.map(p => p.lat);
-      const lons  = trialPoints.map(p => p.lon);
-      centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-      centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
-      zoom = 5;
+    // ── FIX 1: Radius circle center ──────────────────────────────────────────
+    // OLD: always used trialPoints[0] (first trial site, e.g. California) as
+    // the circle center. So if you searched "Boston", the circle appeared in CA.
+    //
+    // NEW: if the user provided a searchCity/searchState, geocode that and use
+    // it as the circle center. This puts the radius circle exactly where the
+    // user searched. Fall back to first trial site if no search location given.
+    // ─────────────────────────────────────────────────────────────────────────
+    let circleLat: number;
+    let circleLon: number;
+
+    if (searchCity || searchState) {
+      setStatusMsg("Centering on your search location...");
+      const searchCoords = await geocodeCity(
+        searchCity  || searchState || "",
+        searchState || searchCity  || ""
+      );
+      if (searchCoords) {
+        circleLat = searchCoords[0];
+        circleLon = searchCoords[1];
+      } else {
+        // Fallback to first trial point if geocoding the search location fails
+        circleLat = trialPoints[0]?.lat ?? 39.5;
+        circleLon = trialPoints[0]?.lon ?? -98.35;
+      }
+    } else {
+      circleLat = trialPoints[0]?.lat ?? 39.5;
+      circleLon = trialPoints[0]?.lon ?? -98.35;
+    }
+
+    // Compute map center & zoom
+    let centerLat = circleLat;
+    let centerLon = circleLon;
+    let zoom = searchCity || searchState ? 8 : 4;
+
+    if (!searchCity && !searchState) {
+      if (trialPoints.length === 1) {
+        centerLat = trialPoints[0].lat; centerLon = trialPoints[0].lon; zoom = 9;
+      } else if (trialPoints.length > 1) {
+        const lats = trialPoints.map(p => p.lat);
+        const lons  = trialPoints.map(p => p.lon);
+        centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+        centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+        zoom = 5;
+      }
     }
 
     if (!containerRef.current) return;
 
     const L = window.L;
 
-    // ── Initialize map (MapQuest or plain Leaflet+OSM) ──
+    // Initialize map
     let map: any;
     if (provider === "mapquest" && window.MQ) {
       map = L.mapquest.map(containerRef.current, {
@@ -221,7 +244,6 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         zoom,
       });
     } else {
-      // Plain Leaflet + OpenStreetMap tiles (free, always works)
       map = L.map(containerRef.current).setView([centerLat, centerLon], zoom);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -230,22 +252,19 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
     }
     mapRef.current = map;
 
-    // ── Helper: create marker icon ──
+    // Helper: create colored pin icon
     function makeIcon(color: string, border: string) {
       if (provider === "mapquest" && window.MQ) {
         return L.mapquest.icons.marker({ primaryColor: color, secondaryColor: border, size: "sm" });
       }
-      // SVG pin for Leaflet fallback — no external dependency
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
         <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="${border}" stroke-width="1.5"/>
         <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
       </svg>`;
-      return L.divIcon({
-        html: svg, className: "", iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36],
-      });
+      return L.divIcon({ html: svg, className: "", iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36] });
     }
 
-    // ── Plot trial site markers ──
+    // Plot trial site markers
     for (const loc of trialPoints) {
       L.marker([loc.lat, loc.lon], { icon: makeIcon("#6366f1", "#c7d2fe") })
         .addTo(map)
@@ -258,16 +277,28 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         );
     }
 
-    // ── Radius circle ──
-    const circleLat = trialPoints[0]?.lat ?? centerLat;
-    const circleLon = trialPoints[0]?.lon ?? centerLon;
+    // ── FIX 1 continued: Draw circle centered on search location ─────────────
     circleRef.current = L.circle([circleLat, circleLon], {
       radius: radius * 1000,
       color: "#6366f1", fillColor: "#c7d2fe",
-      fillOpacity: 0.1, weight: 2, dashArray: "6 4",
+      fillOpacity: 0.12, weight: 2, dashArray: "6 4",
     }).addTo(map);
 
-    // ── Plot physician markers ──
+    // Add a subtle marker at the search center if different from trial sites
+    if (searchCity || searchState) {
+      L.circleMarker([circleLat, circleLon], {
+        radius: 7, color: "#6366f1", fillColor: "#6366f1",
+        fillOpacity: 0.4, weight: 2,
+      }).addTo(map)
+        .bindPopup(
+          `<div style="font-family:system-ui,sans-serif;font-size:12px">
+            <strong style="color:#6366f1">📍 Search Location</strong><br/>
+            <span style="color:#64748b">${[searchCity, searchState].filter(Boolean).join(", ")}</span>
+          </div>`
+        );
+    }
+
+    // Plot physician markers (only those within radius of circle center)
     for (const doc of physicians) {
       let lat = doc.lat, lon = doc.lon;
       if ((!lat || !lon) && doc.city && doc.state) {
@@ -292,20 +323,17 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
         );
     }
 
-    // FIX: invalidateSize after a frame + use ResizeObserver for reliability
-    // The old 250ms setTimeout was unreliable — the container might not have
-    // its final dimensions yet, causing Leaflet to render into a 0px box.
+    // invalidateSize after layout settles + on any container resize
     requestAnimationFrame(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
     });
-
     const ro = new ResizeObserver(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
     });
     if (containerRef.current) ro.observe(containerRef.current);
 
     setMapStatus("ready");
-  }, [trial, physicians]);
+  }, [trial, physicians, searchCity, searchState, radius]);
 
   useEffect(() => {
     buildMap();
@@ -318,97 +346,59 @@ export default function PhysicianTrialMap({ trial, physicians }: Props) {
     };
   }, [buildMap]);
 
+  // Update circle radius without rebuilding the whole map
   useEffect(() => {
     if (circleRef.current) circleRef.current.setRadius(radius * 1000);
   }, [radius]);
 
   return (
-    <div style={{
-      border: "1.5px solid #dde5f5", borderRadius: "14px",
-      overflow: "hidden", boxShadow: "0 2px 12px rgba(99,102,241,0.06)",
-      fontFamily: "'Inter', sans-serif",
-    }}>
+    <div style={{ border: "1.5px solid #dde5f5", borderRadius: "14px", overflow: "hidden", boxShadow: "0 2px 12px rgba(99,102,241,0.06)", fontFamily: "'Inter', sans-serif" }}>
       {/* Header */}
-      <div style={{
-        background: "#fff", padding: "11px 16px",
-        borderBottom: "1px solid #e8edf5",
-        display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
-      }}>
+      <div style={{ background: "#fff", padding: "11px 16px", borderBottom: "1px solid #e8edf5", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
         <span style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a" }}>🗺️ Map View</span>
         <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: "#64748b" }}>
           <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#6366f1", display: "inline-block" }} />
-            Trial Sites
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#6366f1", display: "inline-block" }} /> Trial Sites
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
-            Physicians
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#10b981", display: "inline-block" }} /> Physicians
           </span>
+          {(searchCity || searchState) && (
+            <span style={{ display: "flex", alignItems: "center", gap: "5px", color: "#6366f1" }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#6366f1", opacity: 0.4, display: "inline-block" }} />
+              Search area: {[searchCity, searchState].filter(Boolean).join(", ")}
+            </span>
+          )}
         </div>
         {providerRef.current === "leaflet" && mapStatus === "ready" && (
-          <span style={{ fontSize: "10px", color: "#94a3b8", marginLeft: "4px" }}>
-            (OpenStreetMap)
-          </span>
+          <span style={{ fontSize: "10px", color: "#94a3b8" }}>(OpenStreetMap)</span>
         )}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "9px" }}>
           <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>
             Radius: <strong style={{ color: "#6366f1" }}>{radius} km</strong>
           </span>
-          <input
-            type="range" min={10} max={300} step={10} value={radius}
+          <input type="range" min={10} max={300} step={10} value={radius}
             onChange={e => setRadius(Number(e.target.value))}
-            style={{ width: "100px", accentColor: "#6366f1" }}
-          />
+            style={{ width: "100px", accentColor: "#6366f1" }} />
         </div>
       </div>
 
       {/* Map area */}
       <div style={{ position: "relative", height: "420px" }}>
-
-        {/* Loading / geocoding overlay */}
         {(mapStatus === "loading" || mapStatus === "geocoding") && (
-          <div style={{
-            position: "absolute", inset: 0, background: "#f8faff",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", gap: "10px", zIndex: 10,
-          }}>
+          <div style={{ position: "absolute", inset: 0, background: "#f8faff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", zIndex: 10 }}>
             <div className="geo-spin-ring" />
             <span style={{ fontSize: "13px", color: "#94a3b8" }}>{statusMsg}</span>
           </div>
         )}
-
-        {/* Error overlay */}
         {mapStatus === "error" && (
-          <div style={{
-            position: "absolute", inset: 0, background: "#fef2f2",
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", gap: "8px", zIndex: 10,
-          }}>
+          <div style={{ position: "absolute", inset: 0, background: "#fef2f2", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", zIndex: 10 }}>
             <span style={{ fontSize: "18px" }}>⚠️</span>
-            <span style={{ fontSize: "13px", color: "#dc2626", textAlign: "center", padding: "0 24px" }}>
-              Map failed to load. Check your network connection and try again.
-            </span>
-            <button
-              onClick={buildMap}
-              style={{ marginTop: "8px", padding: "7px 18px", background: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}
-            >
-              Retry
-            </button>
+            <span style={{ fontSize: "13px", color: "#dc2626", textAlign: "center", padding: "0 24px" }}>Map failed to load. Check your network and try again.</span>
+            <button onClick={buildMap} style={{ marginTop: "8px", padding: "7px 18px", background: "#6366f1", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", cursor: "pointer" }}>Retry</button>
           </div>
         )}
-
-        {/* Map container — always in DOM so Leaflet has a stable element to attach to */}
-        <div
-          ref={containerRef}
-          style={{
-            height: "420px",
-            width: "100%",
-            // Hidden while loading but NOT removed from DOM — Leaflet needs
-            // the element to exist and have dimensions before initializing.
-            // Using visibility:hidden keeps the layout box intact.
-            visibility: mapStatus === "ready" ? "visible" : "hidden",
-          }}
-        />
+        <div ref={containerRef} style={{ height: "420px", width: "100%", visibility: mapStatus === "ready" ? "visible" : "hidden" }} />
       </div>
     </div>
   );
