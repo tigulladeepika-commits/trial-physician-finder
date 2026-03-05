@@ -14,9 +14,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Leaflet CSS */}
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-        {/* MapQuest CSS — official CDN (replaces broken jsdelivr URL) */}
-        <link rel="stylesheet" href="https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.css" />
-
         {/* Google Fonts */}
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
@@ -27,11 +24,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
 
-        {/* Leaflet JS — must load before MapQuest */}
+        {/* Leaflet JS — only this needed, no MapQuest SDK required */}
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-        {/* MapQuest JS — official CDN (replaces broken jsdelivr URL) */}
-        <script src="https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js"></script>
       </head>
       <body className="bg-gray-50 font-sans">{children}</body>
     </html>

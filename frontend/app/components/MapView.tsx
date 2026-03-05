@@ -44,10 +44,9 @@ function MapQuestMap({ center, trialLocations, physicians, radius }: MapViewProp
         if (!container) return;
 
         const L = (window as any).L;
-        const MQ = (window as any).MQ;
-
         if (!L) { console.error("[MAP] Leaflet not loaded"); return; }
-        if (!MQ) { console.error("[MAP] MapQuest SDK not loaded"); return; }
+
+        const MAPQUEST_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY || "YOUR_MAPQUEST_API_KEY";
 
         // Tear down existing map before rebuilding
         if (mapRef.current) {
@@ -57,14 +56,10 @@ function MapQuestMap({ center, trialLocations, physicians, radius }: MapViewProp
         (container as any)._leaflet_id = null;
         container.innerHTML = "";
 
-        // Set API key before any MQ calls
-        MQ.KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY || "YOUR_MAPQUEST_API_KEY";
-
-        // FIX: MQ.mapquest.map() requires center as { lat, lng } object — NOT an array
-        const map = MQ.mapquest.map(container, {
-          center: MQ.latLng(center[0], center[1]),
+        // Create plain Leaflet map — no MQ SDK needed
+        const map = L.map(container, {
+          center: [center[0], center[1]],
           zoom: 4,
-          type: "map",
         });
 
         if (cancelled) {
@@ -74,34 +69,39 @@ function MapQuestMap({ center, trialLocations, physicians, radius }: MapViewProp
 
         mapRef.current = map;
 
-        // Trial location markers
+        // MapQuest tile layer — same visual style as the MQ SDK map
+        L.tileLayer(
+          `https://open.mapquestapi.com/tiles/1.0.0/map/{z}/{x}/{y}?key=${MAPQUEST_KEY}`,
+          {
+            attribution: '&copy; <a href="https://www.mapquest.com/">MapQuest</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18,
+          }
+        ).addTo(map);
+
+        // Trial location markers (blue — default Leaflet)
         trialLocations.forEach(({ lat, lon }) => {
           if (!lat || !lon) return;
-          MQ.marker(MQ.latLng(lat, lon))
-            .bindPopup(
-              `<strong>Trial Location</strong><br/>Lat: ${lat.toFixed(2)}, Lon: ${lon.toFixed(2)}`
-            )
+          L.marker([lat, lon])
+            .bindPopup(`<strong>Trial Location</strong><br/>Lat: ${lat.toFixed(2)}, Lon: ${lon.toFixed(2)}`)
             .addTo(map);
         });
 
-        // Physician markers
+        // Physician markers (green)
         physicians.forEach((p) => {
           if (!p.lat || !p.lon) return;
-          const blueIcon = L.icon({
-            iconUrl:
-              "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png",
-            shadowUrl:
-              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+          const greenIcon = L.icon({
+            iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png",
+            shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
           });
-          MQ.marker(MQ.latLng(p.lat, p.lon), { icon: blueIcon })
+          L.marker([p.lat, p.lon], { icon: greenIcon })
             .bindPopup(`<strong>${p.name}</strong><br/>${p.specialty ?? "N/A"}`)
             .addTo(map);
         });
 
-        // Radius circle — L.circle works on MQ maps since MQ extends Leaflet
+        // Radius circle
         if (radius > 0) {
           L.circle([center[0], center[1]], {
             radius: radius * 1609.34, // miles → meters
