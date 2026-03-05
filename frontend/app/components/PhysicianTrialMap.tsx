@@ -11,15 +11,8 @@ type Props = {
   searchState?: string;
 };
 
-const MQ_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY ?? "";
-
-const TILE_URL = MQ_KEY
-  ? `https://tile.mapquest.com/tiles/1.0.0/map/{z}/{x}/{y}.jpg?key=${MQ_KEY}`
-  : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-const TILE_ATTR = MQ_KEY
-  ? '&copy; <a href="https://www.mapquest.com/">MapQuest</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-  : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const TILE_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 declare global { interface Window { L: any; } }
 
