@@ -4,8 +4,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Trial, Physician } from "../types";
 import { geocodeCity, haversineKm } from "../utils/geocode";
 
-// FIX 3: Accept searchCity/searchState so the radius circle centers on what
-// the user searched, not on a random trial site location.
 type Props = {
   trial: Trial;
   physicians: Physician[];
@@ -16,116 +14,16 @@ type Props = {
 const MQ_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY ?? "";
 
 declare global {
-  interface Window { L: any; MQ: any; }
+  interface Window { L: any; }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SDK LOADER
-// Strategy: Try MapQuest first. If it fails/times out → Leaflet + OSM fallback.
-// FIX 2: _sdkState is reset to "idle" on module reload so MapQuest is retried
-// after env var rename + redeploy instead of staying stuck on "leaflet-ready".
-// ─────────────────────────────────────────────────────────────────────────────
-
-type MapProvider = "mapquest" | "leaflet";
-
-// These are module-level so multiple map instances share one SDK load
-let _sdkState: "idle" | "loading" | "mq-ready" | "leaflet-ready" | "error" = "idle";
-const _sdkQueue: Array<(provider: MapProvider) => void> = [];
-
-function loadSDK(): Promise<MapProvider> {
-  return new Promise((resolve) => {
-    if (_sdkState === "mq-ready")      { resolve("mapquest"); return; }
-    if (_sdkState === "leaflet-ready") { resolve("leaflet");  return; }
-
-    _sdkQueue.push(resolve);
-    if (_sdkState === "loading") return;
-    _sdkState = "loading";
-
-    function flushQueue(provider: MapProvider) {
-      _sdkQueue.forEach(cb => cb(provider));
-      _sdkQueue.length = 0;
-    }
-
-    function loadLeafletFallback() {
-      // If Leaflet is already on the page, use it immediately
-      if (typeof window !== "undefined" && window.L && !window.MQ) {
-        _sdkState = "leaflet-ready";
-        flushQueue("leaflet");
-        return;
-      }
-      if (!document.querySelector('link[href*="leaflet@1"]')) {
-        const css = document.createElement("link");
-        css.rel = "stylesheet";
-        css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-        document.head.appendChild(css);
-      }
-      if (window.L) {
-        _sdkState = "leaflet-ready";
-        flushQueue("leaflet");
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = () => { _sdkState = "leaflet-ready"; flushQueue("leaflet"); };
-      script.onerror = () => { _sdkState = "error"; flushQueue("leaflet"); };
-      document.head.appendChild(script);
-    }
-
-    // No key → skip straight to Leaflet
-    if (!MQ_KEY) {
-      loadLeafletFallback();
-      return;
-    }
-
-    // Hard timeout: if MapQuest doesn't load in 8s, fall back
-    const timeout = setTimeout(() => {
-      console.warn("[TrialMap] MapQuest timed out — falling back to Leaflet/OSM");
-      loadLeafletFallback();
-    }, 8000);
-
-    if (!document.querySelector('link[href*="mapquest"]')) {
-      const css = document.createElement("link");
-      css.rel = "stylesheet";
-      css.href = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.css";
-      document.head.appendChild(css);
-    }
-
-    if (!document.querySelector('script[src*="mapquest"]')) {
-      const script = document.createElement("script");
-      script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
-
-      script.onerror = () => {
-        clearTimeout(timeout);
-        console.warn("[TrialMap] MapQuest script failed — falling back to Leaflet/OSM");
-        loadLeafletFallback();
-      };
-
-      script.onload = () => {
-        let attempts = 0;
-        const iv = setInterval(() => {
-          attempts++;
-          if (window.MQ && window.L) {
-            clearInterval(iv);
-            clearTimeout(timeout);
-            window.MQ.key = MQ_KEY;
-            _sdkState = "mq-ready";
-            flushQueue("mapquest");
-          } else if (attempts > 40) {
-            clearInterval(iv);
-            clearTimeout(timeout);
-            loadLeafletFallback();
-          }
-        }, 100);
-      };
-
-      document.head.appendChild(script);
-    }
-  });
+function makeIcon(L: any, color: string, border: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
+    <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="${border}" stroke-width="1.5"/>
+    <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
+  </svg>`;
+  return L.divIcon({ html: svg, className: "", iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36] });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPONENT
-// ─────────────────────────────────────────────────────────────────────────────
 
 type LocPoint = {
   lat: number; lon: number;
@@ -136,38 +34,32 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<any>(null);
   const circleRef    = useRef<any>(null);
-  const providerRef  = useRef<MapProvider>("leaflet");
 
   const [radius,    setRadius]    = useState(50);
   const [mapStatus, setMapStatus] = useState<"loading" | "geocoding" | "ready" | "error">("loading");
-  const [statusMsg, setStatusMsg] = useState("Loading map SDK...");
+  const [statusMsg, setStatusMsg] = useState("Loading map...");
 
   const buildMap = useCallback(async () => {
     if (!containerRef.current) return;
     setMapStatus("loading");
-    setStatusMsg("Loading map SDK...");
+    setStatusMsg("Loading map...");
 
     // Destroy any existing map instance
     if (mapRef.current) {
       try { mapRef.current.remove(); } catch { /* ignore */ }
-      mapRef.current  = null;
+      mapRef.current = null;
       circleRef.current = null;
     }
     const el = containerRef.current;
     (el as any)._leaflet_id = null;
     el.innerHTML = "";
 
-    // Load SDK
-    let provider: MapProvider;
-    try {
-      provider = await loadSDK();
-      providerRef.current = provider;
-    } catch {
+    const L = window.L;
+    if (!L) {
       setMapStatus("error");
-      setStatusMsg("Failed to load map library.");
+      setStatusMsg("Map library not loaded.");
       return;
     }
-    if (!containerRef.current) return;
 
     // Geocode trial site locations
     setMapStatus("geocoding");
@@ -184,14 +76,7 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
       }
     }
 
-    // ── FIX 1: Radius circle center ──────────────────────────────────────────
-    // OLD: always used trialPoints[0] (first trial site, e.g. California) as
-    // the circle center. So if you searched "Boston", the circle appeared in CA.
-    //
-    // NEW: if the user provided a searchCity/searchState, geocode that and use
-    // it as the circle center. This puts the radius circle exactly where the
-    // user searched. Fall back to first trial site if no search location given.
-    // ─────────────────────────────────────────────────────────────────────────
+    // Determine radius circle center
     let circleLat: number;
     let circleLon: number;
 
@@ -205,7 +90,6 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
         circleLat = searchCoords[0];
         circleLon = searchCoords[1];
       } else {
-        // Fallback to first trial point if geocoding the search location fails
         circleLat = trialPoints[0]?.lat ?? 39.5;
         circleLon = trialPoints[0]?.lon ?? -98.35;
       }
@@ -233,40 +117,22 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
 
     if (!containerRef.current) return;
 
-    const L = window.L;
+    // Create map with MapQuest tiles
+    const map = L.map(containerRef.current).setView([centerLat, centerLon], zoom);
 
-    // Initialize map
-    let map: any;
-    if (provider === "mapquest" && window.MQ) {
-      map = L.mapquest.map(containerRef.current, {
-        center: { lat: centerLat, lng: centerLon },
-        layers: L.mapquest.tileLayer("map"),
-        zoom,
-      });
-    } else {
-      map = L.map(containerRef.current).setView([centerLat, centerLon], zoom);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(map);
-    }
-    mapRef.current = map;
-
-    // Helper: create colored pin icon
-    function makeIcon(color: string, border: string) {
-      if (provider === "mapquest" && window.MQ) {
-        return L.mapquest.icons.marker({ primaryColor: color, secondaryColor: border, size: "sm" });
+    L.tileLayer(
+      `https://open.mapquestapi.com/tiles/1.0.0/map/{z}/{x}/{y}?key=${MQ_KEY}`,
+      {
+        attribution: '&copy; <a href="https://www.mapquest.com/">MapQuest</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
       }
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="36" viewBox="0 0 24 36">
-        <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="${color}" stroke="${border}" stroke-width="1.5"/>
-        <circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/>
-      </svg>`;
-      return L.divIcon({ html: svg, className: "", iconSize: [24, 36], iconAnchor: [12, 36], popupAnchor: [0, -36] });
-    }
+    ).addTo(map);
+
+    mapRef.current = map;
 
     // Plot trial site markers
     for (const loc of trialPoints) {
-      L.marker([loc.lat, loc.lon], { icon: makeIcon("#6366f1", "#c7d2fe") })
+      L.marker([loc.lat, loc.lon], { icon: makeIcon(L, "#6366f1", "#c7d2fe") })
         .addTo(map)
         .bindPopup(
           `<div style="max-width:190px;font-family:system-ui,sans-serif;font-size:12px">
@@ -277,14 +143,14 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
         );
     }
 
-    // ── FIX 1 continued: Draw circle centered on search location ─────────────
+    // Draw radius circle
     circleRef.current = L.circle([circleLat, circleLon], {
       radius: radius * 1000,
       color: "#6366f1", fillColor: "#c7d2fe",
       fillOpacity: 0.12, weight: 2, dashArray: "6 4",
     }).addTo(map);
 
-    // Add a subtle marker at the search center if different from trial sites
+    // Search center marker
     if (searchCity || searchState) {
       L.circleMarker([circleLat, circleLon], {
         radius: 7, color: "#6366f1", fillColor: "#6366f1",
@@ -298,7 +164,7 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
         );
     }
 
-    // Plot physician markers (only those within radius of circle center)
+    // Plot physician markers within radius
     for (const doc of physicians) {
       let lat = doc.lat, lon = doc.lon;
       if ((!lat || !lon) && doc.city && doc.state) {
@@ -310,7 +176,7 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
       const distKm = haversineKm(circleLat, circleLon, lat, lon);
       if (distKm > radius) continue;
 
-      L.marker([lat, lon], { icon: makeIcon("#10b981", "#a7f3d0") })
+      L.marker([lat, lon], { icon: makeIcon(L, "#10b981", "#a7f3d0") })
         .addTo(map)
         .bindPopup(
           `<div style="max-width:190px;font-family:system-ui,sans-serif;font-size:12px">
@@ -323,7 +189,6 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
         );
     }
 
-    // invalidateSize after layout settles + on any container resize
     requestAnimationFrame(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
     });
@@ -340,13 +205,12 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
     return () => {
       if (mapRef.current) {
         try { mapRef.current.remove(); } catch { /* ignore */ }
-        mapRef.current  = null;
+        mapRef.current = null;
         circleRef.current = null;
       }
     };
   }, [buildMap]);
 
-  // Update circle radius without rebuilding the whole map
   useEffect(() => {
     if (circleRef.current) circleRef.current.setRadius(radius * 1000);
   }, [radius]);
@@ -370,9 +234,6 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
             </span>
           )}
         </div>
-        {providerRef.current === "leaflet" && mapStatus === "ready" && (
-          <span style={{ fontSize: "10px", color: "#94a3b8" }}>(OpenStreetMap)</span>
-        )}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "9px" }}>
           <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 500 }}>
             Radius: <strong style={{ color: "#6366f1" }}>{radius} km</strong>

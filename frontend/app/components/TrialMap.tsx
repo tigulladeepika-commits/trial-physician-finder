@@ -12,33 +12,7 @@ type Props = {
 const MQ_KEY = process.env.NEXT_PUBLIC_MAPQUEST_KEY ?? "";
 
 declare global {
-  interface Window { L: any; MQ: any; }
-}
-
-function loadMapQuest(): Promise<void> {
-  return new Promise((resolve) => {
-    if (window.MQ && window.L) { resolve(); return; }
-
-    const existing = document.querySelector('script[src*="mapquest"]');
-    if (!existing) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.css";
-      document.head.appendChild(link);
-
-      const script = document.createElement("script");
-      script.src = "https://api.mqcdn.com/sdk/mapquest-js/v1.3.2/mapquest.js";
-      document.head.appendChild(script);
-    }
-
-    const interval = setInterval(() => {
-      if (window.MQ && window.L) {
-        clearInterval(interval);
-        window.MQ.key = MQ_KEY;
-        resolve();
-      }
-    }, 50);
-  });
+  interface Window { L: any; }
 }
 
 export default function TrialMap({ trials, searchedCity, searchedState }: Props) {
@@ -59,9 +33,9 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
     let cancelled = false;
 
     const timer = setTimeout(() => {
-      const init = async () => {
-        await loadMapQuest();
-        if (cancelled || !mapRef.current) return;
+      const init = () => {
+        const L = window.L;
+        if (!L || !mapRef.current) return;
 
         if (mapInstance.current) {
           mapInstance.current.remove();
@@ -69,18 +43,21 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
           circleRef.current = null;
         }
         const container = mapRef.current;
-        if ((container as any)._leaflet_id) {
-          (container as any)._leaflet_id = undefined;
-        }
+        (container as any)._leaflet_id = null;
 
-        const L = window.L;
-        window.MQ.key = MQ_KEY;
+        if (cancelled) return;
 
-        const map = L.mapquest.map(container, {
-          center: [39.5, -98.35],
-          layers: L.mapquest.tileLayer("map"),
-          zoom: hasLocationFilter ? 8 : 4,
-        });
+        // Create map with MapQuest tiles
+        const map = L.map(container).setView([39.5, -98.35], hasLocationFilter ? 8 : 4);
+
+        L.tileLayer(
+          `https://open.mapquestapi.com/tiles/1.0.0/map/{z}/{x}/{y}?key=${MQ_KEY}`,
+          {
+            attribution: '&copy; <a href="https://www.mapquest.com/">MapQuest</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 18,
+          }
+        ).addTo(map);
+
         mapInstance.current = map;
 
         const points: { lat: number; lon: number; title: string; nctId: string }[] = [];
@@ -101,7 +78,7 @@ export default function TrialMap({ trials, searchedCity, searchedState }: Props)
         }
 
         for (const p of points) {
-          L.marker([p.lat, p.lon], { icon: L.mapquest.icons.marker() })
+          L.marker([p.lat, p.lon])
             .addTo(map)
             .bindPopup(`
               <div style="max-width:200px;font-family:sans-serif">
