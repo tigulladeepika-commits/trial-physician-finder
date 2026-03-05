@@ -70,6 +70,8 @@ export default function TrialCard({ trial, searchCity, searchState, searchCondit
   const [showCriteria, setShowCriteria] = useState(false);
   const [showAllLocations, setShowAllLocations] = useState(false);
   const [taxonomyFilter, setTaxonomyFilter] = useState("all");
+  const [specialtySearch, setSpecialtySearch] = useState("");
+  const [specialtyOpen, setSpecialtyOpen] = useState(false);
 
   const usLocations = (trial.locations ?? []).filter(l => l.country === "United States");
   const LOCATIONS_PREVIEW = 8;
@@ -366,17 +368,133 @@ export default function TrialCard({ trial, searchCity, searchState, searchCondit
                 </div>
                 {taxonomyOptions.length > 1 && (
                   <div style={{ position: "relative" }}>
-                    <select className="tax-sel" value={taxonomyFilter} onChange={e => setTaxonomyFilter(e.target.value)}>
-                      <option value="all">All specialties</option>
-                      {taxonomyOptions.map(({ code, desc }) => <option key={code} value={code}>{code + " · " + desc}</option>)}
-                    </select>
-                    <span style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none", fontSize: "9px" }}>▼</span>
+                    {/* ── Searchable specialty dropdown ── */}
+                    <div
+                      style={{
+                        display: "flex", alignItems: "center", gap: "6px",
+                        border: "1.5px solid", borderColor: specialtyOpen ? "#6366f1" : "#e2e8f0",
+                        borderRadius: "8px", padding: "5px 10px",
+                        background: "#fff", cursor: "pointer", minWidth: "220px",
+                        fontSize: "12px", color: "#0f172a",
+                        transition: "border-color 0.15s",
+                      }}
+                      onClick={() => { setSpecialtyOpen(o => !o); setSpecialtySearch(""); }}
+                    >
+                      <span style={{ flex: 1, color: taxonomyFilter === "all" ? "#94a3b8" : "#0f172a" }}>
+                        {taxonomyFilter === "all"
+                          ? "All specialties"
+                          : taxonomyOptions.find(o => o.code === taxonomyFilter)?.desc || taxonomyFilter}
+                      </span>
+                      {taxonomyFilter !== "all" && (
+                        <span
+                          onClick={e => { e.stopPropagation(); setTaxonomyFilter("all"); setSpecialtyOpen(false); }}
+                          style={{ color: "#94a3b8", fontSize: "14px", lineHeight: 1, cursor: "pointer" }}
+                        >×</span>
+                      )}
+                      <span style={{ color: "#94a3b8", fontSize: "9px", transform: specialtyOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▼</span>
+                    </div>
+
+                    {/* Dropdown panel */}
+                    {specialtyOpen && (
+                      <div
+                        style={{
+                          position: "absolute", right: 0, top: "calc(100% + 4px)",
+                          background: "#fff", border: "1.5px solid #e2e8f0",
+                          borderRadius: "10px", zIndex: 50, minWidth: "260px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.10)",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {/* Search input */}
+                        <div style={{ padding: "8px 10px", borderBottom: "1px solid #f1f5f9" }}>
+                          <input
+                            autoFocus
+                            value={specialtySearch}
+                            onChange={e => setSpecialtySearch(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            placeholder="Type to search specialty..."
+                            style={{
+                              width: "100%", border: "1.5px solid #e2e8f0",
+                              borderRadius: "6px", padding: "5px 9px",
+                              fontSize: "12px", outline: "none",
+                              fontFamily: "'Inter', sans-serif", color: "#0f172a",
+                              boxSizing: "border-box",
+                            }}
+                            onFocus={e => e.target.style.borderColor = "#6366f1"}
+                            onBlur={e => e.target.style.borderColor = "#e2e8f0"}
+                          />
+                        </div>
+
+                        {/* Options list */}
+                        <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+                          {/* All specialties option */}
+                          <div
+                            onClick={() => { setTaxonomyFilter("all"); setSpecialtyOpen(false); }}
+                            style={{
+                              padding: "8px 12px", fontSize: "12px", cursor: "pointer",
+                              background: taxonomyFilter === "all" ? "rgba(99,102,241,0.07)" : "#fff",
+                              color: taxonomyFilter === "all" ? "#6366f1" : "#64748b",
+                              fontWeight: taxonomyFilter === "all" ? 600 : 400,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.05)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = taxonomyFilter === "all" ? "rgba(99,102,241,0.07)" : "#fff")}
+                          >
+                            All specialties
+                          </div>
+
+                          {/* Filtered options */}
+                          {taxonomyOptions
+                            .filter(({ code, desc }) =>
+                              !specialtySearch ||
+                              desc.toLowerCase().includes(specialtySearch.toLowerCase()) ||
+                              code.toLowerCase().includes(specialtySearch.toLowerCase())
+                            )
+                            .map(({ code, desc }) => (
+                              <div
+                                key={code}
+                                onClick={() => { setTaxonomyFilter(code); setSpecialtyOpen(false); setSpecialtySearch(""); }}
+                                style={{
+                                  padding: "8px 12px", fontSize: "12px", cursor: "pointer",
+                                  background: taxonomyFilter === code ? "rgba(99,102,241,0.07)" : "#fff",
+                                  color: taxonomyFilter === code ? "#6366f1" : "#0f172a",
+                                  fontWeight: taxonomyFilter === code ? 600 : 400,
+                                  borderTop: "1px solid #f8fafc",
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.background = "rgba(99,102,241,0.05)")}
+                                onMouseLeave={e => (e.currentTarget.style.background = taxonomyFilter === code ? "rgba(99,102,241,0.07)" : "#fff")}
+                              >
+                                <span style={{ color: "#6366f1", fontFamily: "monospace", fontSize: "10px", marginRight: "6px" }}>{code}</span>
+                                {desc}
+                              </div>
+                            ))
+                          }
+
+                          {/* No results */}
+                          {specialtySearch && taxonomyOptions.filter(({ code, desc }) =>
+                            desc.toLowerCase().includes(specialtySearch.toLowerCase()) ||
+                            code.toLowerCase().includes(specialtySearch.toLowerCase())
+                          ).length === 0 && (
+                            <div style={{ padding: "10px 12px", fontSize: "12px", color: "#94a3b8", textAlign: "center" }}>
+                              No specialties match "{specialtySearch}"
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Click outside to close */}
+                    {specialtyOpen && (
+                      <div
+                        style={{ position: "fixed", inset: 0, zIndex: 49 }}
+                        onClick={() => { setSpecialtyOpen(false); setSpecialtySearch(""); }}
+                      />
+                    )}
                   </div>
                 )}
               </div>
               {filteredPhysicians.length === 0 ? (
                 <div className="no-phys">
-                  {taxonomyFilter !== "all" ? "No physicians match this specialty filter." : "No physicians found for this trial's locations."}
+                  {taxonomyFilter !== "all" ? `No physicians match "${taxonomyOptions.find(o => o.code === taxonomyFilter)?.desc || taxonomyFilter}".` : "No physicians found for this trial's locations."}
                 </div>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "9px" }}>
