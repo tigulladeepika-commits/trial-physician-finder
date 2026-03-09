@@ -2,7 +2,6 @@
  * PLACE THIS FILE AT: frontend/app/utils/geocode.ts
  *
  * All geocoding in this app uses Geoapify ONLY.
- * MapQuest is NEVER called for geocoding — only for map tiles and marker icons.
  */
 
 const GEO_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_KEY ?? "";
@@ -11,7 +10,7 @@ const GEO_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_KEY ?? "";
 const geoCache = new Map<string, [number, number] | null>();
 
 /**
- * Geocode a US city + state string using Geoapify.
+ * Geocode a US city + optional state string using Geoapify.
  * Returns [lat, lon] or null if not found.
  */
 export async function geocodeCity(
@@ -26,11 +25,20 @@ export async function geocodeCity(
     return null;
   }
 
-  const cacheKey = (city + "|" + state).toLowerCase().trim();
+  const cityClean  = (city  || "").trim();
+  const stateClean = (state || "").trim();
+
+  if (!cityClean && !stateClean) return null;
+
+  const cacheKey = (cityClean + "|" + stateClean).toLowerCase();
   if (geoCache.has(cacheKey)) return geoCache.get(cacheKey)!;
 
   try {
-    const query = encodeURIComponent(city + ", " + state + ", USA");
+    // Build query string — omit state segment if empty so Geoapify
+    // doesn't get confused by "portland, , USA" and pick the wrong city.
+    const queryParts = [cityClean, stateClean, "USA"].filter(Boolean);
+    const query = encodeURIComponent(queryParts.join(", "));
+
     const url =
       "https://api.geoapify.com/v1/geocode/search" +
       "?text=" + query +
@@ -50,7 +58,7 @@ export async function geocodeCity(
     const feature = data?.features?.[0];
 
     if (!feature) {
-      console.warn("[geocode] No result for:", city, state);
+      console.warn("[geocode] No result for:", cityClean, stateClean);
       geoCache.set(cacheKey, null);
       return null;
     }
@@ -69,7 +77,6 @@ export async function geocodeCity(
 
 /**
  * Haversine formula — straight-line distance between two lat/lon points in km.
- * Used for radius filtering on the map.
  */
 export function haversineKm(
   lat1: number,

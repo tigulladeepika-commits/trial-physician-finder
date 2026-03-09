@@ -76,12 +76,49 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
 
     if (searchCity || searchState) {
       setStatusMsg("Centering on your search location...");
-      const searchCoords = await geocodeCity(searchCity || searchState || "", searchState || searchCity || "");
+      let searchCoords: [number, number] | null = null;
+
+      if (searchCity && searchState) {
+        // Best case: both city and state provided
+        searchCoords = await geocodeCity(searchCity, searchState);
+      } else if (searchCity && !searchState) {
+        // City only — try each unique state from trial locations to find the
+        // closest match, avoiding Portland ME when trial sites are in the west
+        const trialStates = [...new Set(trialPoints.map(p => p.state).filter(Boolean))];
+        if (trialStates.length > 0) {
+          // Geocode city in each trial state and pick the one nearest to trial sites
+          const candidates: Array<{ coords: [number, number]; state: string }> = [];
+          for (const st of trialStates) {
+            const c = await geocodeCity(searchCity, st);
+            if (c) candidates.push({ coords: c, state: st });
+          }
+          if (candidates.length === 1) {
+            searchCoords = candidates[0].coords;
+          } else if (candidates.length > 1 && trialPoints.length > 0) {
+            // Pick candidate closest to centroid of trial sites
+            const centLat = trialPoints.reduce((s, p) => s + p.lat, 0) / trialPoints.length;
+            const centLon = trialPoints.reduce((s, p) => s + p.lon, 0) / trialPoints.length;
+            candidates.sort((a, b) =>
+              haversineKm(centLat, centLon, a.coords[0], a.coords[1]) -
+              haversineKm(centLat, centLon, b.coords[0], b.coords[1])
+            );
+            searchCoords = candidates[0].coords;
+          } else if (candidates.length > 0) {
+            searchCoords = candidates[0].coords;
+          }
+        }
+        // Fallback: geocode city with no state hint
+        if (!searchCoords) searchCoords = await geocodeCity(searchCity, "");
+      } else if (!searchCity && searchState) {
+        searchCoords = await geocodeCity("", searchState);
+      }
+
       if (searchCoords) {
         circleLat = searchCoords[0]; circleLon = searchCoords[1];
       } else {
         circleLat = trialPoints[0]?.lat ?? 39.5; circleLon = trialPoints[0]?.lon ?? -98.35;
       }
+      console.log("[PhysicianTrialMap] circle center:", circleLat, circleLon, "for:", searchCity, searchState);
     } else {
       circleLat = trialPoints[0]?.lat ?? 39.5; circleLon = trialPoints[0]?.lon ?? -98.35;
     }
@@ -145,16 +182,23 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
     // ── Geocode ALL physicians by city+state ──────────────────────────────
     setStatusMsg("Placing physicians on map...");
 
+    console.log("[PhysicianTrialMap] physicians received:", physicians.length, physicians.slice(0,2));
     const physicianCoords = await Promise.all(
       physicians.map(async (p) => {
-        if (p.lat && p.lon) return { p, lat: p.lat, lon: p.lon };
+        // Try existing lat/lon first (from backend geocoding)
+        if (p.lat != null && p.lon != null && p.lat !== 0 && p.lon !== 0) {
+          return { p, lat: p.lat, lon: p.lon };
+        }
+        // Fall back to client-side geocoding by city+state
         if (p.city && p.state) {
           const coords = await geocodeCity(p.city, p.state);
           if (coords) return { p, lat: coords[0], lon: coords[1] };
         }
+        console.warn("[PhysicianTrialMap] Could not geocode physician:", p.name, p.city, p.state, "lat:", p.lat, "lon:", p.lon);
         return null;
       })
     );
+    console.log("[PhysicianTrialMap] geocoded:", physicianCoords.filter(Boolean).length, "of", physicians.length);
 
     // Jitter so overlapping markers (same city) are all visible
     const jitter = () => (Math.random() - 0.5) * 0.008;
@@ -194,7 +238,7 @@ export default function PhysicianTrialMap({ trial, physicians, searchCity, searc
     if (containerRef.current) ro.observe(containerRef.current);
 
     setMapStatus("ready");
-  }, [trial, physicians, searchCity, searchState, radius]);
+  }, [trial, physicians, searchCity, searchState]);
 
   useEffect(() => {
     buildMap();
